@@ -49,7 +49,7 @@ The second form renders a fixed number of frames with a fixed timestep and saves
 
 ## Running the weight-transfer benchmark
 
-The Python tools need `pip install numpy scipy libigl trimesh pygltflib`.
+The Python tools need `pip install numpy scipy libigl pygltflib`.
 
 ```sh
 python3 tools/make_synthetic.py                      # bodies, garments and poses into data/synthetic/
