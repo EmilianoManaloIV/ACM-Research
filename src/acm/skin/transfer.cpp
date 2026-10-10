@@ -211,7 +211,7 @@ InpaintSetup prepareInpaint(const Mesh& source, const Mesh& target, const Transf
         // M8: the region is grown nearest-first and stops when a third dominant
         // bone appears, so it never spans more than one joint.
         std::vector<int> dominant(n, -1);
-        if (params.blendJointCap) {
+        if (params.blendJointCap || params.lengthCap > 0.0) {
             for (int i = 0; i < n; ++i) {
                 if (s.matched(i)) {
                     s.cp.W.row(i).maxCoeff(&dominant[i]);
@@ -224,7 +224,11 @@ InpaintSetup prepareInpaint(const Mesh& source, const Mesh& target, const Transf
             if (!s.matched(seed)) {
                 continue;
             }
-            const double radius = params.offsetBlend * std::sqrt(s.cp.sqrD(seed));
+            double radius = params.offsetBlend * std::sqrt(s.cp.sqrD(seed));
+            if (params.lengthCap > 0.0 && dominant[seed] < params.boneLength.size() &&
+                params.boneLength(dominant[seed]) > 0.0) {
+                radius = std::min(radius, params.lengthCap * params.boneLength(dominant[seed]));
+            }
             Eigen::RowVectorXd sum = Eigen::RowVectorXd::Zero(s.cp.W.cols());
             int count = 0;
             int bonesSeen[2] = {-1, -1};
@@ -492,11 +496,26 @@ TransferResult runTransfer(const std::string& method, const Mesh& source, const 
         }
         return transferAnchored(source, target, p);
     }
+    if (method == "lengthcap") {
+        if (params.boneLength.size() == 0) {
+            throw std::runtime_error("lengthcap needs bone lengths (a rigged source)");
+        }
+        TransferParams p = params;
+        p.relativeMatch = true;
+        p.consistencyCheck = true;
+        if (p.offsetBlend <= 0.0) {
+            p.offsetBlend = 6.0;
+        }
+        if (p.lengthCap <= 0.0) {
+            p.lengthCap = 0.5;
+        }
+        return transferAnchored(source, target, p);
+    }
     throw std::runtime_error("unknown transfer method: " + method);
 }
 
 std::vector<std::string> transferMethodNames() {
-    return {"closest", "inpaint", "bounded", "anchored", "relative", "consistent", "offsetblend", "jointcap"};
+    return {"closest", "inpaint", "bounded", "anchored", "relative", "consistent", "offsetblend", "jointcap", "lengthcap"};
 }
 
 Eigen::MatrixXd pruneInfluences(const Eigen::MatrixXd& W, int maxInfluences) {

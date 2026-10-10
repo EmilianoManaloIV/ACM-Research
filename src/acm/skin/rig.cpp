@@ -28,6 +28,25 @@ Pose identityPose(const Skeleton& skeleton, const std::string& name) {
     return pose;
 }
 
+Eigen::VectorXd boneLengths(const Skeleton& skeleton) {
+    const int n = skeleton.size();
+    // Rest-pose joint positions: the skinning matrices of the identity pose
+    // are G * inverseBind, so G = M * bind.
+    const std::vector<Eigen::Matrix4d> M = skinningMatrices(skeleton, identityPose(skeleton));
+    std::vector<Eigen::Vector3d> position(n);
+    for (int j = 0; j < n; ++j) {
+        position[j] = (M[j] * skeleton.inverseBind[j].inverse()).block<3, 1>(0, 3);
+    }
+    Eigen::VectorXd length = Eigen::VectorXd::Zero(n);
+    for (int j = 0; j < n; ++j) {
+        const int p = skeleton.parent[j];
+        if (p >= 0 && length(p) == 0.0) {
+            length(p) = (position[j] - position[p]).norm();
+        }
+    }
+    return length;
+}
+
 std::vector<Eigen::Matrix4d> skinningMatrices(const Skeleton& skeleton, const Pose& pose) {
     const int n = skeleton.size();
     std::vector<Eigen::Matrix4d> global(n);

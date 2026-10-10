@@ -39,6 +39,10 @@ struct Pose {
 
 Pose identityPose(const Skeleton& skeleton, const std::string& name = "rest");
 
+// Length of each joint's bone at rest: the distance to its first child, or
+// 0 for a leaf joint.
+Eigen::VectorXd boneLengths(const Skeleton& skeleton);
+
 // Per-joint matrices that take a bind-space point to its posed position:
 // G[j] * inverseBind[j], where G walks the hierarchy.
 std::vector<Eigen::Matrix4d> skinningMatrices(const Skeleton& skeleton, const Pose& pose);

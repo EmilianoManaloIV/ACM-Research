@@ -23,6 +23,8 @@ struct TransferParams {
     double consistencyMargin = 2.0;  // matches within this many jump distances of a jump are dropped too
     double offsetBlend = 0.0;        // offsetblend: average matched weights within this many offset distances (0 = off)
     bool blendJointCap = false;      // jointcap: stop the blend region once it spans more than two dominant bones
+    double lengthCap = 0.0;          // lengthcap: blend radius at most this fraction of the dominant bone's length (0 = off)
+    Eigen::VectorXd boneLength;      // one per joint, from boneLengths(); needed by lengthcap
 };
 
 struct TransferResult {
@@ -66,8 +68,12 @@ TransferResult transferAnchored(const Mesh& source, const Mesh& target, const Tr
 // off as soon as it would take in a third dominant bone, so a large scale
 // cannot reach past the next joint. (method name "jointcap")
 
+// M9: offsetblend, with the blend radius capped at a fraction of the length
+// of the vertex's dominant bone, so the region cannot reach past the next
+// joint however far the garment sits from the body. (method name "lengthcap")
+
 // Dispatch by name ("closest", "inpaint", "bounded", "anchored", "relative",
-// "consistent", "offsetblend", "jointcap"); throws on an unknown name.
+// "consistent", "offsetblend", "jointcap", "lengthcap"); throws on an unknown name.
 TransferResult runTransfer(const std::string& method, const Mesh& source, const Mesh& target,
                            const TransferParams& params);
 std::vector<std::string> transferMethodNames();

@@ -5,7 +5,7 @@
 //   weightbench --body body.gltf --garment skirt.obj --poses poses.json [--pose-set test]
 //               [--method closest,inpaint|all] [--out results.csv] [--save-weights dir] [--save-posed dir]
 //               [--prune 4] [--distance 0.05] [--angle 30] [--no-smooth]
-//               [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--skinning lbs|dqs]
+//               [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--length-cap 0.5] [--skinning lbs|dqs]
 //
 //   weightbench --source sphere.obj --source-weights w.csv --garment grid.obj
 //               --method inpaint --save-weights dir
@@ -50,7 +50,7 @@ struct Options {
     std::fprintf(stderr,
                  "usage: %s --body body.gltf --garment garment.(obj|gltf) --poses poses.json\n"
                  "          [--pose-set name] [--method a,b|all] [--out results.csv] [--save-weights dir] [--save-posed dir]\n"
-                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--skinning lbs|dqs]\n"
+                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--length-cap 0.5] [--skinning lbs|dqs]\n"
                  "   or: %s --source mesh.obj --source-weights w.csv --garment mesh.obj --method m --save-weights dir\n",
                  argv0, argv0);
     std::exit(2);
@@ -96,6 +96,7 @@ Options parseArgs(int argc, char** argv) {
         else if (!std::strcmp(a, "--jump")) o.params.consistencyJump = std::atof(value(i));
         else if (!std::strcmp(a, "--margin")) o.params.consistencyMargin = std::atof(value(i));
         else if (!std::strcmp(a, "--offset-blend")) o.params.offsetBlend = std::atof(value(i));
+        else if (!std::strcmp(a, "--length-cap")) o.params.lengthCap = std::atof(value(i));
         else if (!std::strcmp(a, "--skinning")) {
             if (!acm::skin::parseSkinningMode(value(i), o.skinning)) usage(argv[0]);
         }
@@ -131,7 +132,7 @@ std::string baseName(const std::string& path) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    const Options options = parseArgs(argc, argv);
+    Options options = parseArgs(argc, argv);
     using namespace acm::skin;
     try {
         // Source of the weights: a rigged body, or a bare mesh plus a CSV.
@@ -150,6 +151,7 @@ int main(int argc, char** argv) {
             }
         } else {
             rig = loadRig(options.body);
+            options.params.boneLength = boneLengths(rig.skeleton);
         }
         const Mesh garment = loadMesh(options.garment);
         std::vector<Pose> poses;
