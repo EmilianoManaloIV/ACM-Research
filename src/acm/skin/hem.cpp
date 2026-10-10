@@ -148,16 +148,22 @@ Eigen::MatrixXd assignHemWeights(const Mesh& garment, const Eigen::MatrixXd& W,
         // above the pivot would otherwise swing about it with the hem.
         const double hv = r.dot(rig.down) / rig.length;
         const double share = rig.waist > 0.0 ? std::max(0.0, std::min(1.0, hv / rig.waist)) : (hv >= 0.0 ? 1.0 : 0.0);
-        if (share <= 0.0) {
-            continue;
-        }
         double mass = 0.0;
         for (int j = 0; j < static_cast<int>(W.cols()); ++j) {
             if (moves[j]) {
-                mass += share * out(i, j);
-                out(i, j) *= 1.0 - share;
+                mass += out(i, j);
+                out(i, j) = 0.0;
             }
         }
+        if (mass <= 0.0) {
+            continue;
+        }
+        // The waistband's share goes to the joint the rig hangs from, so it
+        // neither swings with the hem nor splits between the legs.
+        if (rig.parentJoint >= 0) {
+            out(i, rig.parentJoint) += mass * (1.0 - share);
+        }
+        mass *= share;
         if (mass <= 0.0) {
             continue;
         }
