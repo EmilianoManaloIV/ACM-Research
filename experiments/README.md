@@ -8,4 +8,5 @@ Each experiment keeps its own `README.md` with the hypothesis, method and result
 
 | Date | Experiment | Status | Outcome |
 |------|------------|--------|---------|
-| 2026-10-10 | [weight-transfer-baselines](2026-10-10-weight-transfer-baselines) | done | Benchmark set up; closest point and Epic inpainting scored on 6 synthetic garments | |
+| 2026-10-10 | [weight-transfer-baselines](2026-10-10-weight-transfer-baselines) | done | Benchmark set up; closest point and Epic inpainting scored on 6 synthetic garments |
+| 2026-10-10 | [bounded-inpainting](2026-10-10-bounded-inpainting) | done | Weights kept in [0, 1]; pose metrics unchanged; kept as default solve | |

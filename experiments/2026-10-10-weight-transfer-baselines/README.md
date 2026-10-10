@@ -37,6 +37,7 @@ garments with detached pieces.
 
 | Garment | Method | Matched | Worst penetration (% verts) | Max depth (% body) | Stretch p95 (worst pose) | Offset drift (mean) | Influences | Time (s) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+<!-- table from the first run; later runs add a Valid column -->
 | cuff | closest | 100% | 26.2 | 3.24 | 0.52 | 1.74% | 2 | 0.001 |
 | cuff | inpaint | | failed: singular inpainting system | | | | | |
 | dress | closest | 100% | 5.3 | 7.34 | 1.28 | 1.16% | 2 | 0.004 |

@@ -30,7 +30,11 @@ TransferResult transferClosestPoint(const Mesh& source, const Mesh& target, cons
 // thresholds, biharmonic inpainting of the rest, then local smoothing.
 TransferResult transferInpaint(const Mesh& source, const Mesh& target, const TransferParams& params);
 
-// Dispatch by name ("closest", "inpaint"); throws on an unknown name.
+// M2: the inpainting energy solved per bone with 0 <= w <= 1 (active set, as
+// in bounded biharmonic weights), rows then normalised to sum to 1.
+TransferResult transferBounded(const Mesh& source, const Mesh& target, const TransferParams& params);
+
+// Dispatch by name ("closest", "inpaint", "bounded"); throws on an unknown name.
 TransferResult runTransfer(const std::string& method, const Mesh& source, const Mesh& target,
                            const TransferParams& params);
 std::vector<std::string> transferMethodNames();
