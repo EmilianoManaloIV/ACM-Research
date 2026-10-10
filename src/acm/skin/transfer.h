@@ -22,6 +22,7 @@ struct TransferParams {
     double consistencyJump = 2.0;    // a jump is a closest-point separation over this many edge lengths
     double consistencyMargin = 2.0;  // matches within this many jump distances of a jump are dropped too
     double offsetBlend = 0.0;        // offsetblend: average matched weights within this many offset distances (0 = off)
+    bool blendJointCap = false;      // jointcap: stop the blend region once it spans more than two dominant bones
 };
 
 struct TransferResult {
@@ -61,8 +62,12 @@ TransferResult transferAnchored(const Mesh& source, const Mesh& target, const Tr
 // blends across a joint over a wider region than the skin. Current default
 // method; the default scale is 4. (method name "offsetblend")
 
+// M8: offsetblend, with the blend region grown outward by distance and cut
+// off as soon as it would take in a third dominant bone, so a large scale
+// cannot reach past the next joint. (method name "jointcap")
+
 // Dispatch by name ("closest", "inpaint", "bounded", "anchored", "relative",
-// "consistent", "offsetblend"); throws on an unknown name.
+// "consistent", "offsetblend", "jointcap"); throws on an unknown name.
 TransferResult runTransfer(const std::string& method, const Mesh& source, const Mesh& target,
                            const TransferParams& params);
 std::vector<std::string> transferMethodNames();

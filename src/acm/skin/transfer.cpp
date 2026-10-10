@@ -208,6 +208,16 @@ InpaintSetup prepareInpaint(const Mesh& source, const Mesh& target, const Transf
     if (params.offsetBlend > 0.0) {
         std::vector<std::vector<int>> adjacency;
         igl::adjacency_list(target.F, adjacency);
+        // M8: the region is grown nearest-first and stops when a third dominant
+        // bone appears, so it never spans more than one joint.
+        std::vector<int> dominant(n, -1);
+        if (params.blendJointCap) {
+            for (int i = 0; i < n; ++i) {
+                if (s.matched(i)) {
+                    s.cp.W.row(i).maxCoeff(&dominant[i]);
+                }
+            }
+        }
         Eigen::MatrixXd blended = s.cp.W;
         std::vector<int> seen(n, -1);
         for (int seed = 0; seed < n; ++seed) {
@@ -217,19 +227,35 @@ InpaintSetup prepareInpaint(const Mesh& source, const Mesh& target, const Transf
             const double radius = params.offsetBlend * std::sqrt(s.cp.sqrD(seed));
             Eigen::RowVectorXd sum = Eigen::RowVectorXd::Zero(s.cp.W.cols());
             int count = 0;
-            std::vector<int> stack{seed};
+            int bonesSeen[2] = {-1, -1};
+            // Min-heap on distance from the seed.
+            std::priority_queue<std::pair<double, int>, std::vector<std::pair<double, int>>,
+                                std::greater<std::pair<double, int>>>
+                queue;
+            queue.emplace(0.0, seed);
             seen[seed] = seed;
-            while (!stack.empty()) {
-                const int v = stack.back();
-                stack.pop_back();
+            while (!queue.empty()) {
+                const int v = queue.top().second;
+                queue.pop();
                 if (s.matched(v)) {
+                    if (params.blendJointCap) {
+                        const int b = dominant[v];
+                        if (bonesSeen[0] < 0 || bonesSeen[0] == b) {
+                            bonesSeen[0] = b;
+                        } else if (bonesSeen[1] < 0 || bonesSeen[1] == b) {
+                            bonesSeen[1] = b;
+                        } else {
+                            break;  // a third bone: the region has reached the next joint
+                        }
+                    }
                     sum += s.cp.W.row(v);
                     ++count;
                 }
                 for (int nb : adjacency[v]) {
-                    if (seen[nb] != seed && (target.V.row(seed) - target.V.row(nb)).norm() < radius) {
+                    const double d = (target.V.row(seed) - target.V.row(nb)).norm();
+                    if (seen[nb] != seed && d < radius) {
                         seen[nb] = seed;
-                        stack.push_back(nb);
+                        queue.emplace(d, nb);
                     }
                 }
             }
@@ -456,11 +482,21 @@ TransferResult runTransfer(const std::string& method, const Mesh& source, const 
         }
         return transferAnchored(source, target, p);
     }
+    if (method == "jointcap") {
+        TransferParams p = params;
+        p.relativeMatch = true;
+        p.consistencyCheck = true;
+        p.blendJointCap = true;
+        if (p.offsetBlend <= 0.0) {
+            p.offsetBlend = 6.0;
+        }
+        return transferAnchored(source, target, p);
+    }
     throw std::runtime_error("unknown transfer method: " + method);
 }
 
 std::vector<std::string> transferMethodNames() {
-    return {"closest", "inpaint", "bounded", "anchored", "relative", "consistent", "offsetblend"};
+    return {"closest", "inpaint", "bounded", "anchored", "relative", "consistent", "offsetblend", "jointcap"};
 }
 
 Eigen::MatrixXd pruneInfluences(const Eigen::MatrixXd& W, int maxInfluences) {
