@@ -1,7 +1,7 @@
 # RQ-002: Automatic skin weights for bipeds, quadrupeds and creatures
 
 - **Opened:** 2026-10-10, drafted from the director's Gate A answer on RQ-001
-- **Current gate:** A, awaiting the research director's decision
+- **Current gate:** B, evidence pass in progress. Gate A passed 2026-10-10
 - **Evidence:** `research/evidence/RQ-002.md` (not started; Gate B)
 - **Experiments:** none yet
 - **Companion question:** [RQ-001](RQ-001-garment-weight-transfer.md), weights for clothing on these characters
@@ -30,7 +30,7 @@ Verified through search listings and abstracts only on 2026-10-10; none read in 
 
 ## Definitions
 
-To be fixed at Gate A. Proposed: the metrics of RQ-001 that apply to a single mesh (stretch p95, mean stretch, torn fraction, self-intersection in place of body penetration), plus agreement with artist-painted weights where the test character has them, reported separately because artist weights are a reference, not ground truth.
+Approved at Gate A: the metrics of RQ-001 that apply to a single mesh (stretch p95, mean stretch, torn fraction, self-intersection in place of body penetration), plus agreement with artist-painted weights where the test character has them, reported separately because artist weights are a reference, not ground truth.
 
 ## Data
 
@@ -41,16 +41,10 @@ To be fixed at Gate A. Proposed: the metrics of RQ-001 that apply to a single me
 
 Proposed, mirroring RQ-001: on held-out poses never used for tuning, a method is no worse than the best baseline by more than 5% (relative) on any primary metric for any character, and better on at least one primary metric for each body plan (biped, quadruped, creature). A negative answer also completes the question.
 
-## Open for Gate A
-
-1. Is the objective right, with skeleton placement out of scope?
-2. Which should come first, RQ-001 (clothing) or RQ-002 (bodies)? They share data: RQ-001 needs weighted quadruped and creature bodies, which RQ-002 would produce.
-3. Do you accept the proposed metrics, including artist-weight agreement as a separate reference measure?
-
 ## Gate log
 
 Only the research director's decisions go here.
 
 | Date | Gate | Decision | By | Note |
 |------|------|----------|----|------|
-| | A | | | |
+| 2026-10-10 | A | Passed: objective as written, skeleton placement out of scope; goes before RQ-001; artist-weight agreement reported as a separate reference measure | Emiliano | |

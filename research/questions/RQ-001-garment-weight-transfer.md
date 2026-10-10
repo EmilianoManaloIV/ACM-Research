@@ -1,7 +1,7 @@
 # RQ-001: Automatic skin weights for clothing on any rigged character
 
 - **Opened:** 2026-10-10 (work began before the gated workflow; this file was reconstructed afterwards)
-- **Current gate:** A. Scope, metrics and completion criteria approved on 2026-10-10; the broadened objective below awaits the director's confirmation
+- **Current gate:** B (not started). Gate A passed 2026-10-10; this question waits for RQ-002, which goes first
 - **Companion question:** [RQ-002](RQ-002-automatic-body-weights.md), automatic weighting of the body itself
 - **Evidence:** `research/evidence/RQ-001.md` (not started; Gate B)
 - **Experiments:** 20 exploratory experiments on branch `claude/project-thread-27uwpy` (draft PR #2), listed in that branch's `experiments/README.md`
@@ -58,14 +58,11 @@ These are leads, not findings. Each is one deterministic run, tuned on its test 
 - On the real (MakeHuman) skirt, plain `kinblend` keeps exposure lowest (11% against 60% for the hem rig as first driven, 14% after side drivers), and nothing tried handles the sit pose.
 - Earlier "beats both baselines" calls rested on metrics or bodies that were later replaced (body v1; worst-pose-only scoring before exposure existed). They need re-checking under the final metrics.
 
-## Open for Gate A
-
-1. Confirm the broadened objective above: clothing on bipeds, quadrupeds and creatures, with body weighting split out as RQ-002.
-
 ## Gate log
 
 Only the research director's decisions go here.
 
 | Date | Gate | Decision | By | Note |
 |------|------|----------|----|------|
-| 2026-10-10 | A | Hem rig in scope; per-pose primary metrics accepted; completion criteria and 5% threshold accepted; a second real body required; objective to cover quadrupeds and unusual creatures, bodies as well as clothes | Emiliano | Objective rewritten from this answer; awaiting confirmation of the wording |
+| 2026-10-10 | A | Hem rig in scope; per-pose primary metrics accepted; completion criteria and 5% threshold accepted; a second real body required; objective to cover quadrupeds and unusual creatures, bodies as well as clothes | Emiliano | Objective rewritten from this answer |
+| 2026-10-10 | A | Passed: broadened objective confirmed as written; RQ-002 goes first | Emiliano | |

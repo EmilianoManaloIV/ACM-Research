@@ -6,7 +6,7 @@ Research and architecture decisions, newest first. Each entry says what was deci
 
 - **Decision:** the research covers automatic weighting of bodies as well as clothes, for bipeds, quadrupeds and unusual creatures. RQ-001 (clothing) keeps the leg-driven hem rig in scope, uses per-pose penetration, exposure and stretch p95 as primary metrics, binds the 5% keep rule, and requires a second real human body. RQ-002 is drafted for body weighting.
 - **Considered:** keeping RQ-001 to human garments only, as the first 20 experiments did.
-- **Approved by:** Emiliano (answers to the RQ-001 Gate A questions); the rewritten objectives await his confirmation.
+- **Approved by:** Emiliano (answers to the RQ-001 Gate A questions, then both objectives confirmed as written). RQ-002 goes first, because RQ-001 needs weighted quadruped and creature bodies.
 
 ## D-004 Commit each experiment's results table (2026-10-10)
 
