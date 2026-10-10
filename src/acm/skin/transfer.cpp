@@ -413,6 +413,53 @@ TransferResult solveBounded(const InpaintSetup& s, const Mesh& target, const Tra
         }
         result.W.col(j) = z;
     }
+    if (params.solveInfluenceLimit > 0 && params.solveInfluenceLimit < bones) {
+        // M11: a second pass with each vertex's support fixed to the top-k
+        // bones of the first, so the solve itself spreads a vertex's weight
+        // over the bones it is allowed to keep, instead of pruning afterwards.
+        const int k = params.solveInfluenceLimit;
+        Eigen::Array<bool, Eigen::Dynamic, Eigen::Dynamic> support(n, bones);
+        support.setConstant(false);
+        std::vector<int> order(bones);
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < bones; ++j) {
+                order[j] = j;
+            }
+            std::partial_sort(order.begin(), order.begin() + k, order.end(),
+                              [&](int a, int b) { return result.W(i, a) > result.W(i, b); });
+            for (int r = 0; r < k; ++r) {
+                support(i, order[r]) = true;
+            }
+        }
+        std::vector<char> isKnown(n, 0);
+        for (int r = 0; r < s.known.size(); ++r) {
+            isKnown[s.known(r)] = 1;
+        }
+        for (int j = 0; j < bones; ++j) {
+            std::vector<int> idx;
+            std::vector<double> val;
+            for (int r = 0; r < s.known.size(); ++r) {
+                const int i = s.known(r);
+                idx.push_back(i);
+                val.push_back(support(i, j) ? std::min(std::max(s.knownValues(r, j), 0.0), 1.0) : 0.0);
+            }
+            for (int i = 0; i < n; ++i) {
+                if (!isKnown[i] && !support(i, j)) {
+                    idx.push_back(i);
+                    val.push_back(0.0);
+                }
+            }
+            const Eigen::VectorXi known2 = Eigen::Map<const Eigen::VectorXi>(idx.data(), static_cast<int>(idx.size()));
+            const Eigen::VectorXd y2 = Eigen::Map<const Eigen::VectorXd>(val.data(), static_cast<int>(val.size()));
+            Eigen::VectorXd z = Eigen::VectorXd::Zero(n);
+            const igl::SolverStatus status =
+                igl::active_set(s.Q, B, known2, y2, Aeq, Beq, Aieq, Bieq, lx, ux, asp, z);
+            if (status == igl::SOLVER_STATUS_ERROR) {
+                throw std::runtime_error("transfer: limited solve failed for bone " + std::to_string(j));
+            }
+            result.W.col(j) = z;
+        }
+    }
     for (int i = 0; i < n; ++i) {
         const double sum = result.W.row(i).sum();
         if (sum > 1e-12) {

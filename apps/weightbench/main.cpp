@@ -5,7 +5,7 @@
 //   weightbench --body body.gltf --garment skirt.obj --poses poses.json [--pose-set test]
 //               [--method closest,inpaint|all] [--out results.csv] [--save-weights dir] [--save-posed dir]
 //               [--prune 4] [--distance 0.05] [--angle 30] [--no-smooth]
-//               [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--length-cap 0.5] [--skinning lbs|dqs]
+//               [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--length-cap 0.5] [--solve-limit 4] [--skinning lbs|dqs]
 //
 //   weightbench --source sphere.obj --source-weights w.csv --garment grid.obj
 //               --method inpaint --save-weights dir
@@ -50,7 +50,7 @@ struct Options {
     std::fprintf(stderr,
                  "usage: %s --body body.gltf --garment garment.(obj|gltf) --poses poses.json\n"
                  "          [--pose-set name] [--method a,b|all] [--out results.csv] [--save-weights dir] [--save-posed dir]\n"
-                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--length-cap 0.5] [--skinning lbs|dqs]\n"
+                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--length-cap 0.5] [--solve-limit 4] [--skinning lbs|dqs]\n"
                  "   or: %s --source mesh.obj --source-weights w.csv --garment mesh.obj --method m --save-weights dir\n",
                  argv0, argv0);
     std::exit(2);
@@ -98,6 +98,7 @@ Options parseArgs(int argc, char** argv) {
         else if (!std::strcmp(a, "--offset-blend")) o.params.offsetBlend = std::atof(value(i));
         else if (!std::strcmp(a, "--length-cap")) o.params.lengthCap = std::atof(value(i));
         else if (!std::strcmp(a, "--kin-steps")) o.params.blendKinSteps = std::atoi(value(i));
+        else if (!std::strcmp(a, "--solve-limit")) o.params.solveInfluenceLimit = std::atoi(value(i));
         else if (!std::strcmp(a, "--skinning")) {
             if (!acm::skin::parseSkinningMode(value(i), o.skinning)) usage(argv[0]);
         }

@@ -28,6 +28,7 @@ struct TransferParams {
     bool blendOnBody = false;        // bodyblend: grow the blend region by distance between closest body points, not garment vertices
     int blendKinSteps = 0;           // kinblend: only average neighbours whose dominant bone is within this many parent/child steps (0 = off)
     Eigen::VectorXi jointParent;     // one per joint, -1 for a root; needed by kinblend
+    int solveInfluenceLimit = 0;     // bounded solves: re-solve with each vertex's weights outside its top-k fixed at 0 (0 = off)
 };
 
 struct TransferResult {
