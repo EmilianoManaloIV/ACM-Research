@@ -49,3 +49,4 @@ The second form renders a fixed number of frames with a fixed timestep and saves
 - **Starting an experiment:** copy `experiments/_template/` to `experiments/YYYY-MM-DD-short-name/`, write the hypothesis before running anything, and log it in `experiments/README.md`.
 - **New rendering prototype:** copy `apps/sandbox/` to a new folder under `apps/`, rename the target in its `CMakeLists.txt`, and add it with `add_subdirectory` in the root `CMakeLists.txt`. Move code into `src/acm/` once a second app needs it.
 - **Data:** keep large files in `data/` and record where they came from in `data/README.md`.
+- **Research workflow:** questions, evidence and decisions live in `research/`; each experiment has a protocol written before it runs and a review by a separate session. [`CLAUDE.md`](CLAUDE.md) describes the stages and the approval gates.

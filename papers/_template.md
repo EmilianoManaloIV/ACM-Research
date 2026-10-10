@@ -5,6 +5,8 @@
 - **Link:** (DOI or arXiv)
 - **Area:** graphics / HCI / software engineering
 - **Tags:**
+- **Read:** full text / abstract only / code only
+- **Verified:** date, and how the reference was checked (DOI resolved, publisher page, listing only)
 
 ## Summary
 
