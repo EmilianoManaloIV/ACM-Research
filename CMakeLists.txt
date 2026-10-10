@@ -30,6 +30,26 @@ FetchContent_Declare(glm
 
 FetchContent_MakeAvailable(glfw glm)
 
+# Geometry processing for the skinning experiments: libigl (header-only, with
+# Eigen fetched by its own CMake) and tinygltf for rigged glTF assets.
+set(LIBIGL_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(LIBIGL_BUILD_TUTORIALS OFF CACHE BOOL "" FORCE)
+set(LIBIGL_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(libigl
+  GIT_REPOSITORY https://github.com/libigl/libigl.git
+  GIT_TAG v2.5.0
+  GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(libigl)
+
+set(TINYGLTF_HEADER_ONLY ON CACHE INTERNAL "" FORCE)
+set(TINYGLTF_INSTALL OFF CACHE INTERNAL "" FORCE)
+set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF CACHE INTERNAL "" FORCE)
+FetchContent_Declare(tinygltf
+  GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+  GIT_TAG v2.9.7
+  GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(tinygltf)
+
 find_package(OpenGL REQUIRED)
 
 # OpenGL 3.3 core loader, generated with glad2 (see third_party/README.md).
@@ -50,4 +70,26 @@ else()
   target_compile_options(acm PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+# Skinning research code: rigged meshes, linear blend skinning, weight
+# transfer methods and the metrics that score them. Kept separate from acm so
+# apps that only need geometry do not link OpenGL.
+add_library(acm_skin
+  src/acm/skin/rig.cpp
+  src/acm/skin/gltf.cpp
+  src/acm/skin/transfer.cpp
+  src/acm/skin/metrics.cpp
+  src/acm/skin/refine.cpp
+  src/acm/skin/hem.cpp)
+target_include_directories(acm_skin PUBLIC src ${tinygltf_SOURCE_DIR})
+target_link_libraries(acm_skin PUBLIC igl::core)
+if(MSVC)
+  target_compile_options(acm_skin PRIVATE /W4)
+else()
+  target_compile_options(acm_skin PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 add_subdirectory(apps/sandbox)
+add_subdirectory(apps/weightbench)
+
+enable_testing()
+add_subdirectory(tests)
