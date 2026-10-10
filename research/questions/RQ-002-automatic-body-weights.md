@@ -1,8 +1,8 @@
 # RQ-002: Automatic skin weights for bipeds, quadrupeds and creatures
 
 - **Opened:** 2026-10-10, drafted from the director's Gate A answer on RQ-001
-- **Current gate:** B, evidence pass in progress. Gate A passed 2026-10-10
-- **Evidence:** `research/evidence/RQ-002.md` (not started; Gate B)
+- **Current gate:** B, evidence ready for the director. Gate A passed 2026-10-10
+- **Evidence:** [`research/evidence/RQ-002.md`](../evidence/RQ-002.md), ready for Gate B
 - **Experiments:** none yet
 - **Companion question:** [RQ-001](RQ-001-garment-weight-transfer.md), weights for clothing on these characters
 
