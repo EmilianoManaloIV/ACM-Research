@@ -20,18 +20,34 @@ struct HemRig {
     std::vector<int> moveFrom;                       // joints whose weight is moved onto the hem bones
     double follow = 1.0;                             // see DrivenJoint
     double falloff = 1.0;
+    bool pivotOnHips = false;                        // "pivot": "hips" (v2) or "mid"
+    bool lowerHangs = false;                         // "lower": "gravity" (v2) or "shank"
     bool applyToMatched = false;                     // "apply": "all" moves matched vertices' leg weight too
+    bool contact = false;                            // "contact": true, hem bones tilt at least enough to clear the thighs
+    double contactClearance = 0.0;                   // "clearance", in model units
+    std::vector<double> legRadius;                   // thigh radius per leg, from measureThighs()
     int firstJoint = -1;                             // index of the first hem joint once added
     Eigen::Vector3d pivot, down, e1, e2;             // set by addHemJoints
     double length = 0.0;
 };
 
-// Reads {"count", "tiers", "parent", "legs": [[hip, knee, ankle], ...], "move": [...]}.
+// Reads {"count", "tiers", "parent", "legs": [[hip, knee, ankle], ...], "move": [...],
+//        "apply": "all"|"unmatched", "follow", "falloff", "pivot": "mid"|"hips",
+//        "lower": "shank"|"gravity", "contact": bool, "clearance"}.
 HemRig loadHemRig(const std::string& path, const Skeleton& skeleton);
+
+// Thigh radius per leg: mean distance of the body vertices the hip bone
+// dominates to the hip-knee axis. Call before addHemJoints when contact is on.
+void measureThighs(const Rig& rig, HemRig& hem);
 
 // Appends the hem joints to the skeleton (as driven joints) and fills the
 // rig's geometry from the rest pose.
 void addHemJoints(Skeleton& skeleton, HemRig& rig);
+
+// Sets each tier-0 hem bone's `radius`: the mean horizontal distance from
+// the pivot of the garment vertices in its azimuth slot, below the hip line.
+// Call after addHemJoints when contact is on.
+void measureHemRadius(const Mesh& garment, Skeleton& skeleton, const HemRig& rig);
 
 // Returns W with columns for the hem joints; for every vertex the transfer
 // did not match, its weight on `moveFrom` joints and the leg chains is moved

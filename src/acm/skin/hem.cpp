@@ -5,6 +5,29 @@
 
 namespace acm::skin {
 
+void measureThighs(const Rig& body, HemRig& hem) {
+    const std::vector<Eigen::Vector3d> rest = restJointPositions(body.skeleton);
+    hem.legRadius.clear();
+    for (const auto& leg : hem.legs) {
+        const Eigen::Vector3d a = rest[leg[0]], b = rest[leg[1]];
+        const Eigen::Vector3d ab = b - a;
+        double sum = 0.0;
+        int count = 0;
+        for (int i = 0; i < body.body.V.rows(); ++i) {
+            int dominant;
+            body.body.W.row(i).maxCoeff(&dominant);
+            if (dominant != leg[0]) {
+                continue;
+            }
+            const Eigen::Vector3d p = body.body.V.row(i).transpose();
+            const double t = std::max(0.0, std::min(1.0, (p - a).dot(ab) / ab.squaredNorm()));
+            sum += (p - (a + t * ab)).norm();
+            ++count;
+        }
+        hem.legRadius.push_back(count ? sum / count : 0.0);
+    }
+}
+
 void addHemJoints(Skeleton& skeleton, HemRig& rig) {
     if (rig.legs.empty()) {
         throw std::runtime_error("hem rig needs at least one leg");
@@ -43,6 +66,12 @@ void addHemJoints(Skeleton& skeleton, HemRig& rig) {
             d.length = rig.length;
             d.follow = rig.follow;
             d.falloff = rig.falloff;
+            d.pivotOnHips = rig.pivotOnHips;
+            if (rig.contact) {
+                d.legRadius = rig.legRadius;
+                d.contactClearance = rig.contactClearance;
+            }
+            d.lowerHangs = rig.lowerHangs;
             d.legs = rig.legs;
             d.parentDriven = tier == 0 ? -1 : k;
             skeleton.names.push_back("hem_t" + std::to_string(tier) + "_" + std::to_string(k));
@@ -56,6 +85,32 @@ void addHemJoints(Skeleton& skeleton, HemRig& rig) {
             skeleton.restLocal.push_back(local);
             skeleton.inverseBind.push_back(Eigen::Matrix4d::Identity());
             skeleton.driven.push_back(d);
+        }
+    }
+}
+
+void measureHemRadius(const Mesh& garment, Skeleton& skeleton, const HemRig& rig) {
+    std::vector<double> sum(rig.count, 0.0);
+    std::vector<int> count(rig.count, 0);
+    const double step = 2.0 * M_PI / rig.count;
+    for (int i = 0; i < garment.V.rows(); ++i) {
+        const Eigen::Vector3d r = garment.V.row(i).transpose() - rig.pivot;
+        const double h = r.dot(rig.down) / rig.length;
+        if (h < 0.0 || h > 1.2) {
+            continue;
+        }
+        double azimuth = std::atan2(r.dot(rig.e2), r.dot(rig.e1));
+        if (azimuth < 0.0) {
+            azimuth += 2.0 * M_PI;
+        }
+        const int k = static_cast<int>(std::lround(azimuth / step)) % rig.count;
+        sum[k] += (r - h * rig.length * rig.down).norm();
+        ++count[k];
+    }
+    for (DrivenJoint& d : skeleton.driven) {
+        const int k = d.joint - rig.firstJoint;
+        if (d.tier == 0 && k >= 0 && k < rig.count) {
+            d.radius = count[k] ? sum[k] / count[k] : 0.0;
         }
     }
 }

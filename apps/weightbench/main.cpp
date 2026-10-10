@@ -176,9 +176,27 @@ int main(int argc, char** argv) {
         HemRig hem;
         if (!options.hemRig.empty()) {
             hem = loadHemRig(options.hemRig, rig.skeleton);
+            if (hem.contact) {
+                measureThighs(rig, hem);
+                std::printf("hem rig: thigh radius");
+                for (double r : hem.legRadius) {
+                    std::printf(" %.3f", r);
+                }
+                std::printf("\n");
+            }
             addHemJoints(rig.skeleton, hem);
         }
         const Mesh garment = loadMesh(options.garment);
+        if (!options.hemRig.empty() && hem.contact) {
+            measureHemRadius(garment, rig.skeleton, hem);
+            std::printf("hem rig: panel radius");
+            for (const DrivenJoint& d : rig.skeleton.driven) {
+                if (d.tier == 0) {
+                    std::printf(" %.3f", d.radius);
+                }
+            }
+            std::printf("\n");
+        }
         std::vector<Pose> poses;
         std::vector<Pose> trainPoses;
         if (!transferOnly && !options.poses.empty()) {

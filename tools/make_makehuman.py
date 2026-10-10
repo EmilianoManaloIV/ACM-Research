@@ -210,7 +210,7 @@ def main(out):
         json.dump(poses, f, indent=1)
     # Leg-driven hem rig for the skirt (weightbench --hem-rig).
     with open(os.path.join(out, "hem.json"), "w") as f:
-        json.dump({"apply": "all", "count": 8, "tiers": 2, "parent": "root", "follow": 0.5, "falloff": 2,
+        json.dump({"apply": "all", "count": 8, "tiers": 2, "parent": "root", "follow": 0.5, "falloff": 2, "lower": "gravity",
                    "legs": [["upperleg01.L", "lowerleg01.L", "foot.L"], ["upperleg01.R", "lowerleg01.R", "foot.R"]],
                    "move": ["pelvis.L", "pelvis.R"]}, f, indent=1)
     print(f"wrote {out}")

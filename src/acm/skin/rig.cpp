@@ -93,7 +93,7 @@ double hemTilt(const DrivenJoint& d, const std::vector<Eigen::Vector3d>& rest,
         const Eigen::Vector3d seg0 = (rest[b] - rest[a]).normalized();
         const Eigen::Matrix3d Rseg = M[a].block<3, 3>(0, 0);
         Eigen::Vector3d seg = Rseg * seg0;
-        if (tier == 1) {
+        if (tier == 1 && !d.lowerHangs) {
             // The shank's swing relative to its thigh, in the thigh's rest frame.
             seg = M[leg[0]].block<3, 3>(0, 0).transpose() * seg;
         }
@@ -111,21 +111,94 @@ double hemTilt(const DrivenJoint& d, const std::vector<Eigen::Vector3d>& rest,
 
 }  // namespace
 
+namespace {
+
+// Where a hem bone pivots: the hip-line midpoint, or (v2) a point slid
+// along the hip line toward the bone's side, so side bones turn about
+// their own hip and front/back bones about the middle.
+Eigen::Vector3d hemPivot(const DrivenJoint& d, const std::vector<Eigen::Vector3d>& rest) {
+    if (!d.pivotOnHips || d.legs.size() < 2) {
+        return d.pivot;
+    }
+    Eigen::Vector3d across = rest[d.legs.back()[0]] - rest[d.legs.front()[0]];
+    across -= across.dot(d.down) * d.down;
+    return d.pivot + 0.5 * d.direction.dot(across.normalized()) * across;
+}
+
+}  // namespace
+
+namespace {
+
+double pointSegmentDistance(const Eigen::Vector3d& p, const Eigen::Vector3d& a, const Eigen::Vector3d& b) {
+    const Eigen::Vector3d ab = b - a;
+    const double t = std::max(0.0, std::min(1.0, (p - a).dot(ab) / std::max(ab.squaredNorm(), 1e-12)));
+    return (p - (a + t * ab)).norm();
+}
+
+// v2 contact: the smallest tilt at or above `tilt` for which the panel the
+// hem bone carries clears every thigh it is being pushed by, sampled down
+// the panel at the bone's horizontal radius (the bone axis itself runs down
+// the middle between the thighs, so sampling it would never clear).
+double hemContactTilt(const DrivenJoint& d, const std::vector<Eigen::Vector3d>& rest,
+                      const std::vector<Eigen::Matrix4d>& M, double tilt, const Eigen::Vector3d& pivot) {
+    if (d.legRadius.size() != d.legs.size()) {
+        return tilt;
+    }
+    for (double t = tilt; t <= M_PI / 2; t += M_PI / 90) {
+        const Eigen::Vector3d dir = std::cos(t) * d.down + std::sin(t) * d.direction;
+        const Eigen::Matrix3d R = Eigen::Quaterniond::FromTwoVectors(d.down, dir).toRotationMatrix();
+        bool clear = true;
+        for (size_t l = 0; l < d.legs.size() && clear; ++l) {
+            const auto& leg = d.legs[l];
+            const Eigen::Vector3d a = (M[leg[0]] * rest[leg[0]].homogeneous()).head<3>();
+            const Eigen::Vector3d b = (M[leg[0]] * rest[leg[1]].homogeneous()).head<3>();
+            // Only a thigh swung toward this bone can push it.
+            Eigen::Vector3d horizontal = (b - a);
+            horizontal -= horizontal.dot(d.down) * d.down;
+            if (horizontal.norm() < 1e-9 || horizontal.normalized().dot(d.direction) <= 0.0) {
+                continue;
+            }
+            for (double s = 0.25; s <= 1.0 && clear; s += 0.25) {
+                // The panel this bone carries, `radius` out from the pivot at its azimuth, rotated with the bone.
+                const Eigen::Vector3d p = pivot + R * (d.radius * d.direction + s * d.length * d.down);
+                clear = pointSegmentDistance(p, a, b) >= d.legRadius[l] + d.contactClearance;
+            }
+        }
+        if (clear) {
+            return t;
+        }
+    }
+    return tilt;
+}
+
+}  // namespace
+
 // Replaces the matrices of the driven joints with their leg-driven poses.
 void driveHemJoints(const Skeleton& skeleton, std::vector<Eigen::Matrix4d>& M) {
     const std::vector<Eigen::Vector3d> rest = restJointPositions(skeleton);
     for (size_t k = 0; k < skeleton.driven.size(); ++k) {
         const DrivenJoint& d = skeleton.driven[k];
         if (d.tier == 0) {
-            const double tilt = hemTilt(d, rest, M, 0);
+            double tilt = hemTilt(d, rest, M, 0);
+            tilt = hemContactTilt(d, rest, M, tilt, hemPivot(d, rest));
             const Eigen::Vector3d dir = std::cos(tilt) * d.down + std::sin(tilt) * d.direction;
-            M[d.joint] = rotateAbout(d.pivot, Eigen::Quaterniond::FromTwoVectors(d.down, dir));
+            M[d.joint] = rotateAbout(hemPivot(d, rest), Eigen::Quaterniond::FromTwoVectors(d.down, dir));
         } else {
             const DrivenJoint& parent = skeleton.driven[d.parentDriven];
             const double tilt = hemTilt(d, rest, M, 1);
             const Eigen::Vector3d dir = std::cos(tilt) * d.down + std::sin(tilt) * d.direction;
-            const Eigen::Vector3d knee = parent.pivot + parent.length * d.down;
-            M[d.joint] = M[parent.joint] * rotateAbout(knee, Eigen::Quaterniond::FromTwoVectors(d.down, dir));
+            const Eigen::Vector3d knee = hemPivot(parent, rest) + parent.length * d.down;
+            if (d.lowerHangs) {
+                // Hang from the posed knee point, oriented in world: the
+                // parent's tilt is undone and only a shank's own swing tilts it.
+                const Eigen::Vector3d kneePosed = (M[parent.joint] * knee.homogeneous()).head<3>();
+                Eigen::Matrix4d m = Eigen::Matrix4d::Identity();
+                m.block<3, 3>(0, 0) = Eigen::Quaterniond::FromTwoVectors(d.down, dir).toRotationMatrix();
+                m.block<3, 1>(0, 3) = kneePosed - m.block<3, 3>(0, 0) * knee;
+                M[d.joint] = m;
+            } else {
+                M[d.joint] = M[parent.joint] * rotateAbout(knee, Eigen::Quaterniond::FromTwoVectors(d.down, dir));
+            }
         }
     }
 }
