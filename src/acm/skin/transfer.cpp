@@ -27,15 +27,16 @@ namespace {
 
 struct ClosestPoints {
     Eigen::VectorXd sqrD;   // squared distance per target vertex
+    Eigen::MatrixXd C;      // closest point on the source per target vertex
     Eigen::MatrixXd W;      // source weights interpolated at the closest point
     Eigen::MatrixXd N;      // source normals interpolated at the closest point
 };
 
 ClosestPoints closestPoints(const Mesh& source, const Mesh& target) {
     Eigen::VectorXi I;
-    Eigen::MatrixXd C;
     ClosestPoints out;
-    igl::point_mesh_squared_distance(target.V, source.V, source.F, out.sqrD, I, C);
+    igl::point_mesh_squared_distance(target.V, source.V, source.F, out.sqrD, I, out.C);
+    const Eigen::MatrixXd& C = out.C;
 
     Eigen::MatrixXd A(C.rows(), 3), B(C.rows(), 3), D(C.rows(), 3);
     for (int i = 0; i < C.rows(); ++i) {
@@ -137,6 +138,50 @@ InpaintSetup prepareInpaint(const Mesh& source, const Mesh& target, const Transf
             close = close || s.cp.sqrD(i) <= localNearest(i) * params.relativeSlack * params.relativeSlack;
         }
         s.matched(i) = close && degrees <= params.angleDegrees;
+    }
+
+    // M4: a match is only trusted where the closest-point map is continuous.
+    // Between the legs of a skirt, neighbouring vertices snap to opposite
+    // legs: their closest points are far apart although they are one edge
+    // apart. Those matches are dropped, and so is everything within
+    // consistencyMargin times the jump distance of them, so the two sides
+    // blend through inpainting over a strip that scales with the jump.
+    if (params.consistencyCheck) {
+        std::vector<std::vector<int>> adjacency;
+        igl::adjacency_list(target.F, adjacency);
+        std::vector<double> reject(n, 0.0);  // dilation radius per seed, 0 = keep
+        for (int i = 0; i < n; ++i) {
+            if (!s.matched(i)) {
+                continue;
+            }
+            for (int nb : adjacency[i]) {
+                if (!s.matched(nb)) {
+                    continue;
+                }
+                const double edge = (target.V.row(i) - target.V.row(nb)).norm();
+                const double jump = (s.cp.C.row(i) - s.cp.C.row(nb)).norm();
+                if (jump > params.consistencyJump * edge) {
+                    reject[i] = std::max(reject[i], params.consistencyMargin * jump);
+                }
+            }
+        }
+        for (int seed = 0; seed < n; ++seed) {
+            if (reject[seed] <= 0.0) {
+                continue;
+            }
+            std::vector<int> stack{seed};
+            s.matched(seed) = false;
+            while (!stack.empty()) {
+                const int v = stack.back();
+                stack.pop_back();
+                for (int nb : adjacency[v]) {
+                    if (s.matched(nb) && (target.V.row(seed) - target.V.row(nb)).norm() < reject[seed]) {
+                        s.matched(nb) = false;
+                        stack.push_back(nb);
+                    }
+                }
+            }
+        }
     }
 
     Eigen::SparseMatrix<double> L;
@@ -358,11 +403,17 @@ TransferResult runTransfer(const std::string& method, const Mesh& source, const 
         p.relativeMatch = true;
         return transferAnchored(source, target, p);
     }
+    if (method == "consistent") {
+        TransferParams p = params;
+        p.relativeMatch = true;
+        p.consistencyCheck = true;
+        return transferAnchored(source, target, p);
+    }
     throw std::runtime_error("unknown transfer method: " + method);
 }
 
 std::vector<std::string> transferMethodNames() {
-    return {"closest", "inpaint", "bounded", "anchored", "relative"};
+    return {"closest", "inpaint", "bounded", "anchored", "relative", "consistent"};
 }
 
 Eigen::MatrixXd pruneInfluences(const Eigen::MatrixXd& W, int maxInfluences) {

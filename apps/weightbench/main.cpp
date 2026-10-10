@@ -3,8 +3,9 @@
 //
 // Usage:
 //   weightbench --body body.gltf --garment skirt.obj --poses poses.json [--pose-set test]
-//               [--method closest,inpaint|all] [--out results.csv] [--save-weights dir]
+//               [--method closest,inpaint|all] [--out results.csv] [--save-weights dir] [--save-posed dir]
 //               [--prune 4] [--distance 0.05] [--angle 30] [--no-smooth]
+//               [--relative-slack 1.5] [--jump 2] [--margin 2]
 //
 //   weightbench --source sphere.obj --source-weights w.csv --garment grid.obj
 //               --method inpaint --save-weights dir
@@ -39,6 +40,7 @@ struct Options {
     std::vector<std::string> methods;
     std::string out;
     std::string saveWeights;
+    std::string savePosed;  // directory for per-pose OBJs and the matched mask, for inspection
     int prune = 0;
     acm::skin::TransferParams params;
 };
@@ -46,8 +48,8 @@ struct Options {
 [[noreturn]] void usage(const char* argv0) {
     std::fprintf(stderr,
                  "usage: %s --body body.gltf --garment garment.(obj|gltf) --poses poses.json\n"
-                 "          [--pose-set name] [--method a,b|all] [--out results.csv] [--save-weights dir]\n"
-                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth]\n"
+                 "          [--pose-set name] [--method a,b|all] [--out results.csv] [--save-weights dir] [--save-posed dir]\n"
+                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2]\n"
                  "   or: %s --source mesh.obj --source-weights w.csv --garment mesh.obj --method m --save-weights dir\n",
                  argv0, argv0);
     std::exit(2);
@@ -84,10 +86,14 @@ Options parseArgs(int argc, char** argv) {
         else if (!std::strcmp(a, "--method")) o.methods = split(value(i), ',');
         else if (!std::strcmp(a, "--out")) o.out = value(i);
         else if (!std::strcmp(a, "--save-weights")) o.saveWeights = value(i);
+        else if (!std::strcmp(a, "--save-posed")) o.savePosed = value(i);
         else if (!std::strcmp(a, "--prune")) o.prune = std::atoi(value(i));
         else if (!std::strcmp(a, "--distance")) o.params.distanceFraction = std::atof(value(i));
         else if (!std::strcmp(a, "--angle")) o.params.angleDegrees = std::atof(value(i));
         else if (!std::strcmp(a, "--no-smooth")) o.params.smooth = false;
+        else if (!std::strcmp(a, "--relative-slack")) o.params.relativeSlack = std::atof(value(i));
+        else if (!std::strcmp(a, "--jump")) o.params.consistencyJump = std::atof(value(i));
+        else if (!std::strcmp(a, "--margin")) o.params.consistencyMargin = std::atof(value(i));
         else usage(argv[0]);
     }
     if (o.garment.empty() || (o.body.empty() && o.source.empty())) {
@@ -97,6 +103,17 @@ Options parseArgs(int argc, char** argv) {
         o.methods = acm::skin::transferMethodNames();
     }
     return o;
+}
+
+void writeOBJ(const std::string& path, const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
+    std::ofstream out(path);
+    out.precision(9);
+    for (int i = 0; i < V.rows(); ++i) {
+        out << "v " << V(i, 0) << ' ' << V(i, 1) << ' ' << V(i, 2) << '\n';
+    }
+    for (int i = 0; i < F.rows(); ++i) {
+        out << "f " << F(i, 0) + 1 << ' ' << F(i, 1) + 1 << ' ' << F(i, 2) + 1 << '\n';
+    }
 }
 
 std::string baseName(const std::string& path) {
@@ -178,6 +195,12 @@ int main(int argc, char** argv) {
                     << ',' << wm.dirichlet << ',' << wm.minWeight << ',' << wm.maxWeight << ',' << wm.maxRowSumError
                     << ',' << wm.maxInfluences << ',' << wm.overLimitFraction << '\n';
             }
+            if (!options.savePosed.empty()) {
+                std::ofstream mask(options.savePosed + "/" + garmentName + "." + method + ".matched.csv");
+                for (int i = 0; i < result.matched.size(); ++i) {
+                    mask << (result.matched(i) ? 1 : 0) << '\n';
+                }
+            }
             if (!options.saveWeights.empty()) {
                 const std::string path = options.saveWeights + "/" + garmentName + "." + method + ".csv";
                 if (!saveWeightsCSV(path, result.W)) {
@@ -193,6 +216,11 @@ int main(int argc, char** argv) {
                 const Eigen::MatrixXd bodyPosed = linearBlendSkin(rig.body.V, rig.body.W, matrices);
                 const Eigen::MatrixXd garmentPosed = linearBlendSkin(garment.V, result.W, matrices);
                 const PoseMetrics pm = evaluatePose(rig.body, bodyPosed, garment, garmentPosed);
+                if (!options.savePosed.empty()) {
+                    const std::string stem = options.savePosed + "/" + garmentName + "." + method + "." + pose.name;
+                    writeOBJ(stem + ".garment.obj", garmentPosed, garment.F);
+                    writeOBJ(stem + ".body.obj", bodyPosed, rig.body.F);
+                }
                 worstPenetration = std::max(worstPenetration, pm.penetrationFraction);
                 worstStretch = std::max(worstStretch, pm.stretchP95);
                 if (csv) {

@@ -58,7 +58,7 @@ python3 tools/summarize_results.py data/results/results.csv
 python3 tools/verify_inpaint.py build/apps/weightbench/weightbench   # C++ inpainting vs Epic's Python
 ```
 
-`weightbench --help` style usage is at the top of `apps/weightbench/main.cpp`. New transfer methods go in `src/acm/skin/transfer.cpp` behind `runTransfer`, and each gets a dated folder in `experiments/` with its results table.
+`weightbench --help` style usage is at the top of `apps/weightbench/main.cpp`. New transfer methods go in `src/acm/skin/transfer.cpp` behind `runTransfer`, and each gets a dated folder in `experiments/` with its results table. Methods so far: `closest`, `inpaint` (Epic 2023), `bounded`, `anchored`, `relative`, `consistent` (current default), each building on the last.
 
 ## Working in this repo
 

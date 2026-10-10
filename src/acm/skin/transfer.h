@@ -18,6 +18,9 @@ struct TransferParams {
     bool relativeMatch = false;      // relative: also match within relativeSlack of the neighbourhood's nearest distance
     double relativeSlack = 1.5;
     double relativeRadiusFraction = 0.05;  // neighbourhood radius as a fraction of the target's bounding-box diagonal
+    bool consistencyCheck = false;   // consistent: drop matches where the closest-point map jumps
+    double consistencyJump = 2.0;    // a jump is a closest-point separation over this many edge lengths
+    double consistencyMargin = 2.0;  // matches within this many jump distances of a jump are dropped too
 };
 
 struct TransferResult {
@@ -48,7 +51,12 @@ TransferResult transferAnchored(const Mesh& source, const Mesh& target, const Tr
 // happens to pass the global threshold.
 // (method name "relative"; implemented as transferAnchored with relativeMatch set)
 
-// Dispatch by name ("closest", "inpaint", "bounded", "anchored", "relative"); throws on an unknown name.
+// M4: relative, plus matches are dropped where neighbouring vertices snap to
+// far-apart body points (the wrong-leg case), with a margin of half the jump,
+// so the gap is inpainted as a blend. (method name "consistent")
+
+// Dispatch by name ("closest", "inpaint", "bounded", "anchored", "relative",
+// "consistent"); throws on an unknown name.
 TransferResult runTransfer(const std::string& method, const Mesh& source, const Mesh& target,
                            const TransferParams& params);
 std::vector<std::string> transferMethodNames();
