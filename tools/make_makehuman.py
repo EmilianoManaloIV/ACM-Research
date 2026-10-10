@@ -22,6 +22,7 @@ Needs: pip install numpy pygltflib
 import json
 import os
 import sys
+import hashlib
 import urllib.request
 
 import numpy as np
@@ -37,6 +38,14 @@ FILES = {
     "default.mhskel": RAW + "rigs/default.mhskel",
     "default_weights.mhw": RAW + "rigs/default_weights.mhw",
 }
+# The files come from a moving branch, so the download is pinned by content:
+# SHA-256 of each file as fetched on 2026-10-10. A mismatch stops the script
+# rather than silently changing the benchmark body.
+SHA256 = {
+    "base.obj": "8e761e6624b8f54536409135d1636da63b32486a90d4897f84e121d144f6fb4c",
+    "default.mhskel": "99f179bce0aa850b45d4191a1d0d234c5851f881c057439470ded3bddf729a24",
+    "default_weights.mhw": "0f3641d651ae3d00ad6b4ccee43142edb109d3bd909d27d9e4139ef1beed8625",
+}
 
 
 def fetch(out):
@@ -47,6 +56,12 @@ def fetch(out):
         if not os.path.exists(path):
             print("downloading", url)
             urllib.request.urlretrieve(url, path)
+        with open(path, "rb") as f:
+            digest = hashlib.sha256(f.read()).hexdigest()
+        if digest != SHA256[name]:
+            sys.exit(f"{name}: SHA-256 {digest} does not match the pinned {SHA256[name]}; "
+                     "upstream changed, or the download is corrupt. Delete it to retry, "
+                     "or update SHA256 with a decision log entry.")
     return raw
 
 
