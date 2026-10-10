@@ -10,4 +10,4 @@ The question-level record, above individual experiments. The workflow and gates 
 
 | ID | Question | Current gate |
 |----|----------|--------------|
-| _add rows as questions are opened_ | | |
+| [RQ-001](questions/RQ-001-garment-weight-transfer.md) | Automatic skin-weight transfer from a body to a garment | A, awaiting decision |
