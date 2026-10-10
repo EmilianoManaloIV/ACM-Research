@@ -176,7 +176,7 @@ int main(int argc, char** argv) {
         HemRig hem;
         if (!options.hemRig.empty()) {
             hem = loadHemRig(options.hemRig, rig.skeleton);
-            if (hem.contact) {
+            if (hem.contact || hem.blend > 0.0) {
                 measureThighs(rig, hem);
                 std::printf("hem rig: thigh radius");
                 for (double r : hem.legRadius) {
@@ -242,7 +242,9 @@ int main(int argc, char** argv) {
                 result.W = pruneInfluences(result.W, options.prune);
             }
             if (!options.hemRig.empty()) {
+                const Eigen::MatrixXd transfer = result.W;
                 result.W = assignHemWeights(garment, result.W, result.matched, rig.skeleton, hem);
+                result.W = blendWithTransfer(garment, transfer, result.W, rig.skeleton, hem);
             }
             if (options.refine) {
                 const auto start = std::chrono::steady_clock::now();

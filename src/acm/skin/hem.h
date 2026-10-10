@@ -23,6 +23,7 @@ struct HemRig {
     bool pivotOnHips = false;                        // "pivot": "hips" (v2) or "mid"
     bool lowerHangs = false;                         // "lower": "gravity" (v2) or "shank"
     bool sideDrive = false;                          // "drive": "side" (v3) or "azimuth"
+    double blend = 0.0;                              // "blend": gap to the thigh surface, in thigh radii, over which the rig takes over from the transfer; 0 = rig everywhere
     double waist = -1.0;                             // "waist": share of the thigh below the hip line over which weight ramps onto the rig; above it the weight goes to the parent. Negative (default): everything moves
     bool applyToMatched = false;                     // "apply": "all" moves matched vertices' leg weight too
     bool contact = false;                            // "contact": true, hem bones tilt at least enough to clear the thighs
@@ -35,7 +36,7 @@ struct HemRig {
 
 // Reads {"count", "tiers", "parent", "legs": [[hip, knee, ankle], ...], "move": [...],
 //        "apply": "all"|"unmatched", "follow", "falloff", "pivot": "mid"|"hips",
-//        "lower": "shank"|"gravity", "drive": "azimuth"|"side", "waist", "contact": bool, "clearance"}.
+//        "lower": "shank"|"gravity", "drive": "azimuth"|"side", "waist", "blend", "contact": bool, "clearance"}.
 HemRig loadHemRig(const std::string& path, const Skeleton& skeleton);
 
 // Thigh radius per leg: mean distance of the body vertices the hip bone
@@ -57,5 +58,13 @@ void measureHemRadius(const Mesh& garment, Skeleton& skeleton, const HemRig& rig
 Eigen::MatrixXd assignHemWeights(const Mesh& garment, const Eigen::MatrixXd& W,
                                  const Eigen::Array<bool, Eigen::Dynamic, 1>& matched, const Skeleton& skeleton,
                                  const HemRig& rig);
+
+// Per-vertex blend of the transfer's weights (`transfer`, body columns
+// only) and the rig's (`withRig`, from assignHemWeights): a vertex within
+// `blend` thigh radii of a thigh surface in rest keeps the transfer, one
+// further from both thighs takes the rig, with a linear ramp between.
+// Needs measureThighs().
+Eigen::MatrixXd blendWithTransfer(const Mesh& garment, const Eigen::MatrixXd& transfer, const Eigen::MatrixXd& withRig,
+                                  const Skeleton& skeleton, const HemRig& rig);
 
 }  // namespace acm::skin

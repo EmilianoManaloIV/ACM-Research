@@ -1,5 +1,7 @@
 #include "acm/skin/hem.h"
 
+#include <limits>
+
 #include <cmath>
 #include <stdexcept>
 
@@ -188,6 +190,29 @@ Eigen::MatrixXd assignHemWeights(const Mesh& garment, const Eigen::MatrixXd& W,
             out(i, t1 + k0) += mass * lower * (1.0 - frac);
             out(i, t1 + k1) += mass * lower * frac;
         }
+    }
+    return out;
+}
+
+Eigen::MatrixXd blendWithTransfer(const Mesh& garment, const Eigen::MatrixXd& transfer, const Eigen::MatrixXd& withRig,
+                                  const Skeleton& skeleton, const HemRig& rig) {
+    if (rig.blend <= 0.0 || rig.legRadius.size() != rig.legs.size()) {
+        return withRig;
+    }
+    const std::vector<Eigen::Vector3d> rest = restJointPositions(skeleton);
+    Eigen::MatrixXd out = withRig;
+    for (int i = 0; i < garment.V.rows(); ++i) {
+        const Eigen::Vector3d p = garment.V.row(i).transpose();
+        double gap = std::numeric_limits<double>::infinity();
+        for (size_t l = 0; l < rig.legs.size(); ++l) {
+            const Eigen::Vector3d a = rest[rig.legs[l][0]], b = rest[rig.legs[l][1]];
+            const Eigen::Vector3d ab = b - a;
+            const double t = std::max(0.0, std::min(1.0, (p - a).dot(ab) / ab.squaredNorm()));
+            gap = std::min(gap, ((p - (a + t * ab)).norm() - rig.legRadius[l]) / rig.legRadius[l]);
+        }
+        const double rigShare = std::max(0.0, std::min(1.0, gap / rig.blend));
+        out.row(i) *= rigShare;
+        out.row(i).head(transfer.cols()) += (1.0 - rigShare) * transfer.row(i);
     }
     return out;
 }

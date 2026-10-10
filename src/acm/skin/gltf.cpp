@@ -343,6 +343,7 @@ HemRig loadHemRig(const std::string& path, const Skeleton& skeleton) {
     rig.lowerHangs = doc.value("lower", std::string("shank")) == "gravity";
     rig.sideDrive = doc.value("drive", std::string("azimuth")) == "side";
     rig.waist = doc.value("waist", -1.0);
+    rig.blend = doc.value("blend", 0.0);
     rig.contact = doc.value("contact", false);
     rig.contactClearance = doc.value("clearance", 0.0);
     auto joint = [&](const std::string& name) {
