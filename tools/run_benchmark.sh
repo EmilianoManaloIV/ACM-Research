@@ -21,8 +21,10 @@ for case in $CASES; do
   body=$(dirname "$case")
   garment=$(basename "$case")
   echo "== $case"
+  HEM=""
+  case "$garment" in skirt|dress) [ -f "$DATA/$body/hem.json" ] && HEM="--hem-rig $DATA/$body/hem.json" ;; esac
   "$BENCH" --body "$DATA/$body/body.gltf" --garment "$DATA/$case.obj" --poses "$DATA/$body/poses.json" \
-    --pose-set test --method "$METHODS" --skinning "$SKINNING" --out "$OUT/$garment.csv" --save-weights "$OUT/weights" | grep -v '^source'
+    --pose-set test --method "$METHODS" --skinning "$SKINNING" $HEM --out "$OUT/$garment.csv" --save-weights "$OUT/weights" | grep -v '^source'
   if [ -f "$OUT/results.csv" ]; then
     tail -n +2 "$OUT/$garment.csv" >> "$OUT/results.csv"
   else

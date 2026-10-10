@@ -2,6 +2,7 @@
 
 #include <igl/per_vertex_normals.h>
 
+#include <cmath>
 #include <fstream>
 #include <functional>
 #include <sstream>
@@ -28,15 +29,38 @@ Pose identityPose(const Skeleton& skeleton, const std::string& name) {
     return pose;
 }
 
+std::vector<Eigen::Matrix4d> restGlobals(const Skeleton& skeleton) {
+    // Walks restLocal only, so it is safe to call while driven joints are
+    // being added (skinningMatrices would try to drive them).
+    const int n = skeleton.size();
+    std::vector<Eigen::Matrix4d> global(n);
+    std::vector<char> done(n, 0);
+    const std::function<const Eigen::Matrix4d&(int)> globalOf = [&](int j) -> const Eigen::Matrix4d& {
+        if (!done[j]) {
+            global[j] = skeleton.parent[j] < 0 ? skeleton.restLocal[j]
+                                               : globalOf(skeleton.parent[j]) * skeleton.restLocal[j];
+            done[j] = 1;
+        }
+        return global[j];
+    };
+    for (int j = 0; j < n; ++j) {
+        globalOf(j);
+    }
+    return global;
+}
+
+std::vector<Eigen::Vector3d> restJointPositions(const Skeleton& skeleton) {
+    const std::vector<Eigen::Matrix4d> G = restGlobals(skeleton);
+    std::vector<Eigen::Vector3d> position(G.size());
+    for (size_t j = 0; j < G.size(); ++j) {
+        position[j] = G[j].block<3, 1>(0, 3);
+    }
+    return position;
+}
+
 Eigen::VectorXd boneLengths(const Skeleton& skeleton) {
     const int n = skeleton.size();
-    // Rest-pose joint positions: the skinning matrices of the identity pose
-    // are G * inverseBind, so G = M * bind.
-    const std::vector<Eigen::Matrix4d> M = skinningMatrices(skeleton, identityPose(skeleton));
-    std::vector<Eigen::Vector3d> position(n);
-    for (int j = 0; j < n; ++j) {
-        position[j] = (M[j] * skeleton.inverseBind[j].inverse()).block<3, 1>(0, 3);
-    }
+    const std::vector<Eigen::Vector3d> position = restJointPositions(skeleton);
     Eigen::VectorXd length = Eigen::VectorXd::Zero(n);
     for (int j = 0; j < n; ++j) {
         const int p = skeleton.parent[j];
@@ -45,6 +69,65 @@ Eigen::VectorXd boneLengths(const Skeleton& skeleton) {
         }
     }
     return length;
+}
+
+namespace {
+
+Eigen::Matrix4d rotateAbout(const Eigen::Vector3d& pivot, const Eigen::Quaterniond& q) {
+    Eigen::Matrix4d m = Eigen::Matrix4d::Identity();
+    m.block<3, 3>(0, 0) = q.toRotationMatrix();
+    m.block<3, 1>(0, 3) = pivot - q * pivot;
+    return m;
+}
+
+// Tilt of a hem bone toward its azimuth: the largest leg swing in that
+// direction, with each leg's swing angle scaled by how much of it points
+// along the bone's azimuth (a leg swinging straight at the bone counts in
+// full, one swinging sideways to it not at all).
+double hemTilt(const DrivenJoint& d, const std::vector<Eigen::Vector3d>& rest,
+               const std::vector<Eigen::Matrix4d>& M, int tier) {
+    double tilt = 0.0;
+    for (const auto& leg : d.legs) {
+        const int a = tier == 0 ? leg[0] : leg[1];
+        const int b = tier == 0 ? leg[1] : leg[2];
+        const Eigen::Vector3d seg0 = (rest[b] - rest[a]).normalized();
+        const Eigen::Matrix3d Rseg = M[a].block<3, 3>(0, 0);
+        Eigen::Vector3d seg = Rseg * seg0;
+        if (tier == 1) {
+            // The shank's swing relative to its thigh, in the thigh's rest frame.
+            seg = M[leg[0]].block<3, 3>(0, 0).transpose() * seg;
+        }
+        const double swing = std::acos(std::max(-1.0, std::min(1.0, seg.dot(seg0))));
+        Eigen::Vector3d horizontal = seg - seg.dot(d.down) * d.down;
+        const double h = horizontal.norm();
+        if (h < 1e-9) {
+            continue;
+        }
+        horizontal /= h;
+        tilt = std::max(tilt, swing * std::pow(std::max(0.0, horizontal.dot(d.direction)), d.falloff));
+    }
+    return d.follow * tilt;
+}
+
+}  // namespace
+
+// Replaces the matrices of the driven joints with their leg-driven poses.
+void driveHemJoints(const Skeleton& skeleton, std::vector<Eigen::Matrix4d>& M) {
+    const std::vector<Eigen::Vector3d> rest = restJointPositions(skeleton);
+    for (size_t k = 0; k < skeleton.driven.size(); ++k) {
+        const DrivenJoint& d = skeleton.driven[k];
+        if (d.tier == 0) {
+            const double tilt = hemTilt(d, rest, M, 0);
+            const Eigen::Vector3d dir = std::cos(tilt) * d.down + std::sin(tilt) * d.direction;
+            M[d.joint] = rotateAbout(d.pivot, Eigen::Quaterniond::FromTwoVectors(d.down, dir));
+        } else {
+            const DrivenJoint& parent = skeleton.driven[d.parentDriven];
+            const double tilt = hemTilt(d, rest, M, 1);
+            const Eigen::Vector3d dir = std::cos(tilt) * d.down + std::sin(tilt) * d.direction;
+            const Eigen::Vector3d knee = parent.pivot + parent.length * d.down;
+            M[d.joint] = M[parent.joint] * rotateAbout(knee, Eigen::Quaterniond::FromTwoVectors(d.down, dir));
+        }
+    }
 }
 
 std::vector<Eigen::Matrix4d> skinningMatrices(const Skeleton& skeleton, const Pose& pose) {
@@ -67,6 +150,9 @@ std::vector<Eigen::Matrix4d> skinningMatrices(const Skeleton& skeleton, const Po
     std::vector<Eigen::Matrix4d> result(n);
     for (int j = 0; j < n; ++j) {
         result[j] = globalOf(j) * skeleton.inverseBind[j];
+    }
+    if (!skeleton.driven.empty()) {
+        driveHemJoints(skeleton, result);
     }
     return result;
 }

@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -19,12 +20,30 @@ struct Mesh {
     bool isSkinned() const { return W.rows() == V.rows() && W.cols() > 0; }
 };
 
+// A helper joint whose pose is computed from the legs instead of read from a
+// Pose: a hem bone that hangs from the hip line and is pushed by whichever
+// leg swings toward it (see hem.h). Tier 0 pivots on the hip line, tier 1
+// hangs from its tier-0 bone at knee height and follows the shanks.
+struct DrivenJoint {
+    int joint = -1;                 // index in the skeleton
+    int tier = 0;
+    int parentDriven = -1;          // index into Skeleton::driven for tier 1
+    Eigen::Vector3d direction;      // unit horizontal azimuth of this bone
+    Eigen::Vector3d down;           // unit rest direction of the legs
+    Eigen::Vector3d pivot;          // world rest pivot (hip-line midpoint)
+    double length = 0.0;            // tier-0 bone length (hip line to knee height)
+    double follow = 1.0;            // share of a leg's swing the bone takes (cloth slides over the thigh)
+    double falloff = 1.0;           // exponent on the azimuth cosine: higher, narrower push
+    std::vector<std::array<int, 3>> legs;  // (hip, knee, ankle) joint indices
+};
+
 // Joint hierarchy with the transforms needed for linear blend skinning.
 struct Skeleton {
     std::vector<std::string> names;
     std::vector<int> parent;                   // -1 for a root joint
     std::vector<Eigen::Matrix4d> restLocal;    // joint transform relative to its parent
     std::vector<Eigen::Matrix4d> inverseBind;  // world-to-joint at bind time
+    std::vector<DrivenJoint> driven;           // helper joints posed from other joints
 
     int size() const { return static_cast<int>(names.size()); }
     int find(const std::string& name) const;  // -1 if missing
@@ -39,9 +58,19 @@ struct Pose {
 
 Pose identityPose(const Skeleton& skeleton, const std::string& name = "rest");
 
+// World (rest-pose) transform of every joint, from restLocal alone.
+std::vector<Eigen::Matrix4d> restGlobals(const Skeleton& skeleton);
+
+// World position of every joint at rest.
+std::vector<Eigen::Vector3d> restJointPositions(const Skeleton& skeleton);
+
 // Length of each joint's bone at rest: the distance to its first child, or
 // 0 for a leaf joint.
 Eigen::VectorXd boneLengths(const Skeleton& skeleton);
+
+// Poses the driven (hem) joints from the regular joints' matrices; called by
+// skinningMatrices when the skeleton has any.
+void driveHemJoints(const Skeleton& skeleton, std::vector<Eigen::Matrix4d>& matrices);
 
 // Per-joint matrices that take a bind-space point to its posed position:
 // G[j] * inverseBind[j], where G walks the hierarchy.

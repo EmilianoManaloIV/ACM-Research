@@ -6,7 +6,7 @@
 //               [--method closest,inpaint|all] [--out results.csv] [--save-weights dir] [--save-posed dir]
 //               [--prune 4] [--distance 0.05] [--angle 30] [--no-smooth]
 //               [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--length-cap 0.5] [--solve-limit 4] [--skinning lbs|dqs]
-//               [--refine [--train-set train] [--refine-support 8] [--refine-prior 0.1] [--refine-clearance 0.5]]
+//               [--hem-rig hem.json] [--refine [--train-set train] [--refine-support 8] [--refine-prior 0.1] [--refine-clearance 0.5]]
 //
 //   weightbench --source sphere.obj --source-weights w.csv --garment grid.obj
 //               --method inpaint --save-weights dir
@@ -17,6 +17,7 @@
 // "weights" row per method with the weight metrics and run time.
 
 #include "acm/skin/gltf.h"
+#include "acm/skin/hem.h"
 #include "acm/skin/metrics.h"
 #include "acm/skin/refine.h"
 #include "acm/skin/transfer.h"
@@ -45,6 +46,7 @@ struct Options {
     std::string saveWeights;
     std::string savePosed;  // directory for per-pose OBJs and the matched mask, for inspection
     int prune = 0;
+    std::string hemRig;             // M12: JSON spec of leg-driven hem joints
     bool refine = false;            // M6: refine the transferred weights on the training poses
     std::string trainSet = "train";
     acm::skin::RefineParams refineParams;
@@ -57,7 +59,7 @@ struct Options {
                  "usage: %s --body body.gltf --garment garment.(obj|gltf) --poses poses.json\n"
                  "          [--pose-set name] [--method a,b|all] [--out results.csv] [--save-weights dir] [--save-posed dir]\n"
                  "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--length-cap 0.5] [--solve-limit 4] [--skinning lbs|dqs]\n"
-                 "          [--refine [--train-set train] [--refine-support 8] [--refine-prior 0.1] [--refine-clearance 0.5]]\n"
+                 "          [--hem-rig hem.json] [--refine [--train-set train] [--refine-support 8] [--refine-prior 0.1] [--refine-clearance 0.5]]\n"
                  "   or: %s --source mesh.obj --source-weights w.csv --garment mesh.obj --method m --save-weights dir\n",
                  argv0, argv0);
     std::exit(2);
@@ -107,6 +109,7 @@ Options parseArgs(int argc, char** argv) {
         else if (!std::strcmp(a, "--kin-steps")) o.params.blendKinSteps = std::atoi(value(i));
         else if (!std::strcmp(a, "--solve-limit")) o.params.solveInfluenceLimit = std::atoi(value(i));
         else if (!std::strcmp(a, "--refine")) o.refine = true;
+        else if (!std::strcmp(a, "--hem-rig")) o.hemRig = value(i);
         else if (!std::strcmp(a, "--train-set")) o.trainSet = value(i);
         else if (!std::strcmp(a, "--refine-support")) o.refineParams.support = std::atoi(value(i));
         else if (!std::strcmp(a, "--refine-prior")) o.refineParams.prior = std::atof(value(i));
@@ -170,6 +173,11 @@ int main(int argc, char** argv) {
             options.params.jointParent = Eigen::Map<const Eigen::VectorXi>(rig.skeleton.parent.data(),
                                                                            static_cast<int>(rig.skeleton.parent.size()));
         }
+        HemRig hem;
+        if (!options.hemRig.empty()) {
+            hem = loadHemRig(options.hemRig, rig.skeleton);
+            addHemJoints(rig.skeleton, hem);
+        }
         const Mesh garment = loadMesh(options.garment);
         std::vector<Pose> poses;
         std::vector<Pose> trainPoses;
@@ -199,7 +207,8 @@ int main(int argc, char** argv) {
         const std::string garmentName = baseName(options.garment);
 
         for (const std::string& baseMethod : options.methods) {
-            const std::string method = options.refine ? baseMethod + "+refine" : baseMethod;
+            const std::string method =
+                baseMethod + (options.hemRig.empty() ? "" : "+hem") + (options.refine ? "+refine" : "");
             TransferResult result;
             try {
                 result = runTransfer(baseMethod, rig.body, garment, options.params);
@@ -213,6 +222,9 @@ int main(int argc, char** argv) {
             }
             if (options.prune > 0) {
                 result.W = pruneInfluences(result.W, options.prune);
+            }
+            if (!options.hemRig.empty()) {
+                result.W = assignHemWeights(garment, result.W, result.matched, rig.skeleton, hem);
             }
             if (options.refine) {
                 const auto start = std::chrono::steady_clock::now();

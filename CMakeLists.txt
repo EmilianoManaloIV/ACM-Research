@@ -78,7 +78,8 @@ add_library(acm_skin
   src/acm/skin/gltf.cpp
   src/acm/skin/transfer.cpp
   src/acm/skin/metrics.cpp
-  src/acm/skin/refine.cpp)
+  src/acm/skin/refine.cpp
+  src/acm/skin/hem.cpp)
 target_include_directories(acm_skin PUBLIC src ${tinygltf_SOURCE_DIR})
 target_link_libraries(acm_skin PUBLIC igl::core)
 if(MSVC)

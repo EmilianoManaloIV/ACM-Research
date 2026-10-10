@@ -333,6 +333,10 @@ def make_legs(out):
     }
     with open(os.path.join(out, "poses.json"), "w") as f:
         json.dump(poses, f, indent=1)
+    # Leg-driven hem rig for the skirt and dress (weightbench --hem-rig).
+    with open(os.path.join(out, "hem.json"), "w") as f:
+        json.dump({"apply": "all", "count": 8, "tiers": 2, "parent": "pelvis", "follow": 0.5, "falloff": 2,
+                   "legs": [["hip_L", "knee_L", "ankle_L"], ["hip_R", "knee_R", "ankle_R"]]}, f, indent=1)
 
 
 if __name__ == "__main__":

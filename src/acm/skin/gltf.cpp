@@ -1,4 +1,5 @@
 #include "acm/skin/gltf.h"
+#include "acm/skin/hem.h"
 
 #define TINYGLTF_IMPLEMENTATION
 #define TINYGLTF_NO_STB_IMAGE
@@ -323,6 +324,44 @@ std::vector<Pose> loadPoses(const std::string& path, const Skeleton& skeleton, c
         poses.push_back(pose);
     }
     return poses;
+}
+
+HemRig loadHemRig(const std::string& path, const Skeleton& skeleton) {
+    std::ifstream in(path);
+    if (!in) {
+        throw std::runtime_error("Could not read " + path);
+    }
+    json doc;
+    in >> doc;
+    HemRig rig;
+    rig.count = doc.value("count", 8);
+    rig.tiers = doc.value("tiers", 2);
+    rig.applyToMatched = doc.value("apply", std::string("unmatched")) == "all";
+    rig.follow = doc.value("follow", 1.0);
+    rig.falloff = doc.value("falloff", 1.0);
+    auto joint = [&](const std::string& name) {
+        const int j = skeleton.find(name);
+        if (j < 0) {
+            throw std::runtime_error(path + " names unknown joint " + name);
+        }
+        return j;
+    };
+    if (doc.contains("parent")) {
+        rig.parentJoint = joint(doc["parent"].get<std::string>());
+    }
+    for (const json& leg : doc["legs"]) {
+        if (!leg.is_array() || leg.size() != 3) {
+            throw std::runtime_error(path + ": each leg needs [hip, knee, ankle]");
+        }
+        rig.legs.push_back({joint(leg[0].get<std::string>()), joint(leg[1].get<std::string>()),
+                            joint(leg[2].get<std::string>())});
+    }
+    if (doc.contains("move")) {
+        for (const json& name : doc["move"]) {
+            rig.moveFrom.push_back(joint(name.get<std::string>()));
+        }
+    }
+    return rig;
 }
 
 }  // namespace acm::skin

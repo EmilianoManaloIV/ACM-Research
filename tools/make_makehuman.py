@@ -14,6 +14,7 @@ skeleton and skin weights from the makehuman repository on GitHub, and writes:
                                topology: garments with real shapes and real
                                looseness, with no cloth of their own
     data/makehuman/poses.json  train/test pose sets on the leg, arm and spine bones
+    data/makehuman/hem.json    leg-driven hem rig for the skirt (weightbench --hem-rig)
 
 Needs: pip install numpy pygltflib
 """
@@ -207,6 +208,11 @@ def main(out):
     }
     with open(os.path.join(out, "poses.json"), "w") as f:
         json.dump(poses, f, indent=1)
+    # Leg-driven hem rig for the skirt (weightbench --hem-rig).
+    with open(os.path.join(out, "hem.json"), "w") as f:
+        json.dump({"apply": "all", "count": 8, "tiers": 2, "parent": "root", "follow": 0.5, "falloff": 2,
+                   "legs": [["upperleg01.L", "lowerleg01.L", "foot.L"], ["upperleg01.R", "lowerleg01.R", "foot.R"]],
+                   "move": ["pelvis.L", "pelvis.R"]}, f, indent=1)
     print(f"wrote {out}")
 
 
