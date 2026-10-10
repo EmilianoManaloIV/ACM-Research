@@ -6,6 +6,7 @@
 //               [--method closest,inpaint|all] [--out results.csv] [--save-weights dir] [--save-posed dir]
 //               [--prune 4] [--distance 0.05] [--angle 30] [--no-smooth]
 //               [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--length-cap 0.5] [--solve-limit 4] [--skinning lbs|dqs]
+//               [--refine [--train-set train] [--refine-support 8] [--refine-prior 0.1] [--refine-clearance 0.5]]
 //
 //   weightbench --source sphere.obj --source-weights w.csv --garment grid.obj
 //               --method inpaint --save-weights dir
@@ -17,8 +18,10 @@
 
 #include "acm/skin/gltf.h"
 #include "acm/skin/metrics.h"
+#include "acm/skin/refine.h"
 #include "acm/skin/transfer.h"
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -42,6 +45,9 @@ struct Options {
     std::string saveWeights;
     std::string savePosed;  // directory for per-pose OBJs and the matched mask, for inspection
     int prune = 0;
+    bool refine = false;            // M6: refine the transferred weights on the training poses
+    std::string trainSet = "train";
+    acm::skin::RefineParams refineParams;
     acm::skin::SkinningMode skinning = acm::skin::SkinningMode::LinearBlend;  // for body and garment alike
     acm::skin::TransferParams params;
 };
@@ -51,6 +57,7 @@ struct Options {
                  "usage: %s --body body.gltf --garment garment.(obj|gltf) --poses poses.json\n"
                  "          [--pose-set name] [--method a,b|all] [--out results.csv] [--save-weights dir] [--save-posed dir]\n"
                  "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--length-cap 0.5] [--solve-limit 4] [--skinning lbs|dqs]\n"
+                 "          [--refine [--train-set train] [--refine-support 8] [--refine-prior 0.1] [--refine-clearance 0.5]]\n"
                  "   or: %s --source mesh.obj --source-weights w.csv --garment mesh.obj --method m --save-weights dir\n",
                  argv0, argv0);
     std::exit(2);
@@ -99,6 +106,12 @@ Options parseArgs(int argc, char** argv) {
         else if (!std::strcmp(a, "--length-cap")) o.params.lengthCap = std::atof(value(i));
         else if (!std::strcmp(a, "--kin-steps")) o.params.blendKinSteps = std::atoi(value(i));
         else if (!std::strcmp(a, "--solve-limit")) o.params.solveInfluenceLimit = std::atoi(value(i));
+        else if (!std::strcmp(a, "--refine")) o.refine = true;
+        else if (!std::strcmp(a, "--train-set")) o.trainSet = value(i);
+        else if (!std::strcmp(a, "--refine-support")) o.refineParams.support = std::atoi(value(i));
+        else if (!std::strcmp(a, "--refine-prior")) o.refineParams.prior = std::atof(value(i));
+        else if (!std::strcmp(a, "--refine-clearance")) o.refineParams.clearanceShare = std::atof(value(i));
+        else if (!std::strcmp(a, "--refine-iterations")) o.refineParams.relaxIterations = std::atoi(value(i));
         else if (!std::strcmp(a, "--skinning")) {
             if (!acm::skin::parseSkinningMode(value(i), o.skinning)) usage(argv[0]);
         }
@@ -159,9 +172,14 @@ int main(int argc, char** argv) {
         }
         const Mesh garment = loadMesh(options.garment);
         std::vector<Pose> poses;
+        std::vector<Pose> trainPoses;
         if (!transferOnly && !options.poses.empty()) {
             poses = loadPoses(options.poses, rig.skeleton, options.poseSet);
+            if (options.refine) {
+                trainPoses = loadPoses(options.poses, rig.skeleton, options.trainSet);
+            }
         }
+        options.refineParams.skinning = options.skinning;
         std::printf("source: %d vertices, %d joints; garment: %d vertices; %d poses; skinning %s\n",
                     static_cast<int>(rig.body.V.rows()), static_cast<int>(rig.body.W.cols()),
                     static_cast<int>(garment.V.rows()), static_cast<int>(poses.size()),
@@ -180,10 +198,11 @@ int main(int argc, char** argv) {
         }
         const std::string garmentName = baseName(options.garment);
 
-        for (const std::string& method : options.methods) {
+        for (const std::string& baseMethod : options.methods) {
+            const std::string method = options.refine ? baseMethod + "+refine" : baseMethod;
             TransferResult result;
             try {
-                result = runTransfer(method, rig.body, garment, options.params);
+                result = runTransfer(baseMethod, rig.body, garment, options.params);
             } catch (const std::exception& e) {
                 // A method that cannot handle a garment is a result worth recording.
                 std::printf("%-10s FAILED: %s\n", method.c_str(), e.what());
@@ -194,6 +213,15 @@ int main(int argc, char** argv) {
             }
             if (options.prune > 0) {
                 result.W = pruneInfluences(result.W, options.prune);
+            }
+            if (options.refine) {
+                const auto start = std::chrono::steady_clock::now();
+                const RefineResult refined = refinePoseAware(rig, garment, result.W, trainPoses, options.refineParams);
+                result.W = refined.W;
+                result.seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+                std::printf("%-10s refined on %d poses: targets moved %.3f%% of body, fit residual %.3f%%\n",
+                            method.c_str(), static_cast<int>(trainPoses.size()), 100.0 * refined.targetChange,
+                            100.0 * refined.fitResidual);
             }
             const double matchedFraction =
                 static_cast<double>(result.matched.count()) / static_cast<double>(garment.V.rows());
