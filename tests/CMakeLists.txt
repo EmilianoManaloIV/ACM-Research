@@ -1,3 +1,6 @@
 add_executable(skinning_test skinning_test.cpp)
 target_link_libraries(skinning_test PRIVATE acm_skin)
 add_test(NAME skinning_test COMMAND skinning_test)
+add_executable(autoweight_test autoweight_test.cpp)
+target_link_libraries(autoweight_test PRIVATE acm_skin)
+add_test(NAME autoweight_test COMMAND autoweight_test)

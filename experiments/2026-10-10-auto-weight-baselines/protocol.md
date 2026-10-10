@@ -81,4 +81,7 @@ The second experiment adds the released learned models under the same protocol: 
 
 | Date | Change | Reason | Approved by |
 |------|--------|--------|-------------|
-| | | | |
+| 2026-10-10 | Body weighting is a separate program, `bodybench`, not a mode of `weightbench`. | It scores a body against itself, with different inputs and columns from the garment benchmark; sharing one program would make both harder to read. | pending (Gate D) |
+| 2026-10-10 | Weights from every method are row-normalised before the validity check: negatives above -1e-9 set to zero, then each row divided by its sum. A row that sums to zero stays zero and counts as a failure (`unweighted`). | Blender and libigl both normalise at deform time, so un-normalised output is not what an artist would see. Unweighted vertices are the failure that matters and are still caught. | pending (Gate D) |
+| 2026-10-10 | Random poses leave root joints at rest. | Turning the root moves the whole body rigidly and changes no metric. | pending (Gate D) |
+| 2026-10-10 | "Bend each limb chain fully" made concrete: the 5 longest unbranched chains (a chain runs from a child of a branching joint or root down to the next branching joint or leaf), every joint turned 45 degrees about an axis perpendicular to its bone. | "Fully" had no number. 45 degrees per joint matches the random-pose limit; on the MakeHuman body this picks both legs to the foot, both arms to the wrist, and the lower spine. | pending (Gate D) |

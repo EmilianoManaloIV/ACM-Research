@@ -42,6 +42,16 @@ Coverage coverage(const Mesh& bodyRest, const Mesh& garmentRest);
 double exposureFraction(const Coverage& cover, const Eigen::MatrixXd& bodyPosed, const Mesh& garmentRest,
                         const Eigen::MatrixXd& garmentPosed);
 
+// Edge stretch of a posed mesh against its rest shape: fills stretchP95,
+// stretchMax, stretchMean and tornFraction of m.
+void stretchMetrics(const Eigen::MatrixXi& F, const Eigen::MatrixXd& rest, const Eigen::MatrixXd& posed, PoseMetrics& m);
+
+// Share of faces that intersect a face they share no vertex with. RQ-002
+// reports the posed value minus the rest value, so a mesh that already
+// overlaps itself at rest (eyes, teeth, layered shells) is not penalised.
+// Coplanar overlap is not detected; posed skin rarely produces it.
+double selfIntersectionFraction(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
+
 PoseMetrics evaluatePose(const Mesh& bodyRest, const Eigen::MatrixXd& bodyPosed, const Mesh& garmentRest,
                          const Eigen::MatrixXd& garmentPosed);
 
