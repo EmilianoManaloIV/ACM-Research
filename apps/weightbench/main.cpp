@@ -5,7 +5,7 @@
 //   weightbench --body body.gltf --garment skirt.obj --poses poses.json [--pose-set test]
 //               [--method closest,inpaint|all] [--out results.csv] [--save-weights dir] [--save-posed dir]
 //               [--prune 4] [--distance 0.05] [--angle 30] [--no-smooth]
-//               [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 2] [--skinning lbs|dqs]
+//               [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--skinning lbs|dqs]
 //
 //   weightbench --source sphere.obj --source-weights w.csv --garment grid.obj
 //               --method inpaint --save-weights dir
@@ -50,7 +50,7 @@ struct Options {
     std::fprintf(stderr,
                  "usage: %s --body body.gltf --garment garment.(obj|gltf) --poses poses.json\n"
                  "          [--pose-set name] [--method a,b|all] [--out results.csv] [--save-weights dir] [--save-posed dir]\n"
-                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 2] [--skinning lbs|dqs]\n"
+                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 4] [--skinning lbs|dqs]\n"
                  "   or: %s --source mesh.obj --source-weights w.csv --garment mesh.obj --method m --save-weights dir\n",
                  argv0, argv0);
     std::exit(2);

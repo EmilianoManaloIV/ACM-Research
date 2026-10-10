@@ -452,7 +452,7 @@ TransferResult runTransfer(const std::string& method, const Mesh& source, const 
         p.relativeMatch = true;
         p.consistencyCheck = true;
         if (p.offsetBlend <= 0.0) {
-            p.offsetBlend = 2.0;
+            p.offsetBlend = 4.0;  // scale 4 was the sweep's best under both skinning models (synthetic-body-v2, offset-blend-v2)
         }
         return transferAnchored(source, target, p);
     }

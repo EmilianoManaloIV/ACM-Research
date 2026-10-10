@@ -58,7 +58,8 @@ TransferResult transferAnchored(const Mesh& source, const Mesh& target, const Tr
 
 // M7: consistent, plus each matched vertex's copied weights are averaged over
 // a radius proportional to its distance from the body, so a loose garment
-// blends across a joint over a wider region than the skin. (method name "offsetblend")
+// blends across a joint over a wider region than the skin. Current default
+// method; the default scale is 4. (method name "offsetblend")
 
 // Dispatch by name ("closest", "inpaint", "bounded", "anchored", "relative",
 // "consistent", "offsetblend"); throws on an unknown name.

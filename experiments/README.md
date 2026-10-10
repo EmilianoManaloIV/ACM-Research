@@ -18,3 +18,4 @@ Rows up to and including skinning-model were measured on synthetic body v1 (hard
 | 2026-10-10 | [offset-blend](2026-10-10-offset-blend) | done, not adopted | Wider blend on loose garments increases LBS collapse at the elbow; the limit is the skinning model, not the weights |
 | 2026-10-10 | [skinning-model](2026-10-10-skinning-model) | done | Benchmark scores under LBS and DQS; DQS punishes the wide blends LBS rewarded; synthetic bodies found to be hard-skinned at the joints |
 | 2026-10-10 | [synthetic-body-v2](2026-10-10-synthetic-body-v2) | done | Bodies regenerated with ringed capsules and a centred blend; every method re-run under LBS and DQS; skirt call stands, dress call flips to closest point, offset blend works under DQS |
+| 2026-10-10 | [offset-blend-v2](2026-10-10-offset-blend-v2) | done | Offset-scaled blend re-swept on body v2: scale 4 improves both primary metrics on every garment under DQS and all but one under LBS; now the default method |
