@@ -88,3 +88,6 @@ endif()
 
 add_subdirectory(apps/sandbox)
 add_subdirectory(apps/weightbench)
+
+enable_testing()
+add_subdirectory(tests)

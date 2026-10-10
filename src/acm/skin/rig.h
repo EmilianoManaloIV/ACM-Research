@@ -47,6 +47,21 @@ std::vector<Eigen::Matrix4d> skinningMatrices(const Skeleton& skeleton, const Po
 Eigen::MatrixXd linearBlendSkin(const Eigen::MatrixXd& V, const Eigen::MatrixXd& W,
                                 const std::vector<Eigen::Matrix4d>& matrices);
 
+// Dual quaternion skinning (Kavan et al. 2008): blends rigid transforms as
+// dual quaternions, so bent joints keep their volume instead of collapsing.
+// Each matrix must be rigid (rotation plus translation); scale is dropped.
+Eigen::MatrixXd dualQuaternionSkin(const Eigen::MatrixXd& V, const Eigen::MatrixXd& W,
+                                   const std::vector<Eigen::Matrix4d>& matrices);
+
+enum class SkinningMode { LinearBlend, DualQuaternion };
+
+// Parses "lbs" or "dqs"; returns false on anything else.
+bool parseSkinningMode(const std::string& text, SkinningMode& mode);
+const char* skinningModeName(SkinningMode mode);
+
+Eigen::MatrixXd skin(const Eigen::MatrixXd& V, const Eigen::MatrixXd& W,
+                     const std::vector<Eigen::Matrix4d>& matrices, SkinningMode mode);
+
 // A rigged character: the body mesh and the skeleton it is bound to.
 struct Rig {
     Mesh body;

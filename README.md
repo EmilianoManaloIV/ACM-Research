@@ -10,7 +10,7 @@ The repository holds three kinds of work side by side: notes on related papers, 
 papers/        Related-work notes, one Markdown file per paper (start from papers/_template.md)
 experiments/   One dated folder per experiment with its hypothesis, method and results
 src/acm/       Shared C++ library: window and OpenGL context, shaders, framebuffer capture
-src/acm/skin/  Skinning research code: rigged glTF loading, linear blend skinning, weight transfer, metrics
+src/acm/skin/  Skinning research code: rigged glTF loading, linear blend and dual quaternion skinning, weight transfer, metrics
 apps/sandbox/  Starter app: a lit, rotating cube to copy for new rendering experiments
 apps/weightbench/  Scores a weight-transfer method on a garment over a set of poses
 tools/         Python helpers: synthetic benchmark data, reference checks, result tables
@@ -58,7 +58,7 @@ python3 tools/summarize_results.py data/results/results.csv
 python3 tools/verify_inpaint.py build/apps/weightbench/weightbench   # C++ inpainting vs Epic's Python
 ```
 
-`weightbench --help` style usage is at the top of `apps/weightbench/main.cpp`. New transfer methods go in `src/acm/skin/transfer.cpp` behind `runTransfer`, and each gets a dated folder in `experiments/` with its results table. Methods so far: `closest`, `inpaint` (Epic 2023), `bounded`, `anchored`, `relative`, `consistent` (current default), `offsetblend`, each building on the last.
+`weightbench --help` style usage is at the top of `apps/weightbench/main.cpp`. New transfer methods go in `src/acm/skin/transfer.cpp` behind `runTransfer`, and each gets a dated folder in `experiments/` with its results table. Methods so far: `closest`, `inpaint` (Epic 2023), `bounded`, `anchored`, `relative`, `consistent` (current default), `offsetblend`, each building on the last. `--skinning lbs|dqs` picks the skinning model for scoring (`tools/run_benchmark.sh out all dqs`). `ctest --test-dir build` runs the skinning check.
 
 ## Working in this repo
 

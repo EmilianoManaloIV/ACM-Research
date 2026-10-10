@@ -5,7 +5,7 @@
 //   weightbench --body body.gltf --garment skirt.obj --poses poses.json [--pose-set test]
 //               [--method closest,inpaint|all] [--out results.csv] [--save-weights dir] [--save-posed dir]
 //               [--prune 4] [--distance 0.05] [--angle 30] [--no-smooth]
-//               [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 2]
+//               [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 2] [--skinning lbs|dqs]
 //
 //   weightbench --source sphere.obj --source-weights w.csv --garment grid.obj
 //               --method inpaint --save-weights dir
@@ -42,6 +42,7 @@ struct Options {
     std::string saveWeights;
     std::string savePosed;  // directory for per-pose OBJs and the matched mask, for inspection
     int prune = 0;
+    acm::skin::SkinningMode skinning = acm::skin::SkinningMode::LinearBlend;  // for body and garment alike
     acm::skin::TransferParams params;
 };
 
@@ -49,7 +50,7 @@ struct Options {
     std::fprintf(stderr,
                  "usage: %s --body body.gltf --garment garment.(obj|gltf) --poses poses.json\n"
                  "          [--pose-set name] [--method a,b|all] [--out results.csv] [--save-weights dir] [--save-posed dir]\n"
-                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 2]\n"
+                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth] [--relative-slack 1.5] [--jump 2] [--margin 2] [--offset-blend 2] [--skinning lbs|dqs]\n"
                  "   or: %s --source mesh.obj --source-weights w.csv --garment mesh.obj --method m --save-weights dir\n",
                  argv0, argv0);
     std::exit(2);
@@ -95,6 +96,9 @@ Options parseArgs(int argc, char** argv) {
         else if (!std::strcmp(a, "--jump")) o.params.consistencyJump = std::atof(value(i));
         else if (!std::strcmp(a, "--margin")) o.params.consistencyMargin = std::atof(value(i));
         else if (!std::strcmp(a, "--offset-blend")) o.params.offsetBlend = std::atof(value(i));
+        else if (!std::strcmp(a, "--skinning")) {
+            if (!acm::skin::parseSkinningMode(value(i), o.skinning)) usage(argv[0]);
+        }
         else usage(argv[0]);
     }
     if (o.garment.empty() || (o.body.empty() && o.source.empty())) {
@@ -152,9 +156,10 @@ int main(int argc, char** argv) {
         if (!transferOnly && !options.poses.empty()) {
             poses = loadPoses(options.poses, rig.skeleton, options.poseSet);
         }
-        std::printf("source: %d vertices, %d joints; garment: %d vertices; %d poses\n",
+        std::printf("source: %d vertices, %d joints; garment: %d vertices; %d poses; skinning %s\n",
                     static_cast<int>(rig.body.V.rows()), static_cast<int>(rig.body.W.cols()),
-                    static_cast<int>(garment.V.rows()), static_cast<int>(poses.size()));
+                    static_cast<int>(garment.V.rows()), static_cast<int>(poses.size()),
+                    skinningModeName(options.skinning));
 
         std::ofstream csv;
         if (!options.out.empty()) {
@@ -214,8 +219,8 @@ int main(int argc, char** argv) {
             double worstStretch = 0.0;
             for (const Pose& pose : poses) {
                 const std::vector<Eigen::Matrix4d> matrices = skinningMatrices(rig.skeleton, pose);
-                const Eigen::MatrixXd bodyPosed = linearBlendSkin(rig.body.V, rig.body.W, matrices);
-                const Eigen::MatrixXd garmentPosed = linearBlendSkin(garment.V, result.W, matrices);
+                const Eigen::MatrixXd bodyPosed = skin(rig.body.V, rig.body.W, matrices, options.skinning);
+                const Eigen::MatrixXd garmentPosed = skin(garment.V, result.W, matrices, options.skinning);
                 const PoseMetrics pm = evaluatePose(rig.body, bodyPosed, garment, garmentPosed);
                 if (!options.savePosed.empty()) {
                     const std::string stem = options.savePosed + "/" + garmentName + "." + method + "." + pose.name;
