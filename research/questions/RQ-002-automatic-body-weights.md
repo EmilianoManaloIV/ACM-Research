@@ -1,7 +1,7 @@
 # RQ-002: Automatic skin weights for bipeds, quadrupeds and creatures
 
 - **Opened:** 2026-10-10, drafted from the director's Gate A answer on RQ-001
-- **Current gate:** D, implementing the first protocol. Gates A to C passed 2026-10-10
+- **Current gate:** D. The first protocol is implemented and run (experiment `2026-10-10-auto-weight-baselines`); Gate D sign-off and Gate E are waiting on the director. Gates A to C passed 2026-10-10
 - **Evidence:** [`research/evidence/RQ-002.md`](../evidence/RQ-002.md), ready for Gate B
 - **Experiments:** [auto-weight-baselines](../../experiments/2026-10-10-auto-weight-baselines/protocol.md) (protocol approved; implementation in progress)
 - **Companion question:** [RQ-001](RQ-001-garment-weight-transfer.md), weights for clothing on these characters
