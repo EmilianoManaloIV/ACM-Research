@@ -97,6 +97,7 @@ Options parseArgs(int argc, char** argv) {
         else if (!std::strcmp(a, "--margin")) o.params.consistencyMargin = std::atof(value(i));
         else if (!std::strcmp(a, "--offset-blend")) o.params.offsetBlend = std::atof(value(i));
         else if (!std::strcmp(a, "--length-cap")) o.params.lengthCap = std::atof(value(i));
+        else if (!std::strcmp(a, "--kin-steps")) o.params.blendKinSteps = std::atoi(value(i));
         else if (!std::strcmp(a, "--skinning")) {
             if (!acm::skin::parseSkinningMode(value(i), o.skinning)) usage(argv[0]);
         }
@@ -152,6 +153,8 @@ int main(int argc, char** argv) {
         } else {
             rig = loadRig(options.body);
             options.params.boneLength = boneLengths(rig.skeleton);
+            options.params.jointParent = Eigen::Map<const Eigen::VectorXi>(rig.skeleton.parent.data(),
+                                                                           static_cast<int>(rig.skeleton.parent.size()));
         }
         const Mesh garment = loadMesh(options.garment);
         std::vector<Pose> poses;

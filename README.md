@@ -58,7 +58,7 @@ python3 tools/summarize_results.py data/results/results.csv
 python3 tools/verify_inpaint.py build/apps/weightbench/weightbench   # C++ inpainting vs Epic's Python
 ```
 
-`weightbench --help` style usage is at the top of `apps/weightbench/main.cpp`. New transfer methods go in `src/acm/skin/transfer.cpp` behind `runTransfer`, and each gets a dated folder in `experiments/` with its results table. Methods so far: `closest`, `inpaint` (Epic 2023), `bounded`, `anchored`, `relative`, `consistent`, `offsetblend` (current default, scale 4), `jointcap`, `lengthcap`, each building on the last. `--skinning lbs|dqs` picks the skinning model for scoring (`tools/run_benchmark.sh out all dqs`). `ctest --test-dir build` runs the skinning check. `python3 tools/make_makehuman.py` fetches the MakeHuman body (CC0) and `tools/run_benchmark.sh out all lbs makehuman` scores it.
+`weightbench --help` style usage is at the top of `apps/weightbench/main.cpp`. New transfer methods go in `src/acm/skin/transfer.cpp` behind `runTransfer`, and each gets a dated folder in `experiments/` with its results table. Methods so far: `closest`, `inpaint` (Epic 2023), `bounded`, `anchored`, `relative`, `consistent`, `offsetblend`, `jointcap`, `lengthcap`, `bodyblend`, `kinblend` (current default: offset blend at scale 4, limited to bones within two hierarchy steps), each building on the last. `--skinning lbs|dqs` picks the skinning model for scoring (`tools/run_benchmark.sh out all dqs`). `ctest --test-dir build` runs the skinning check. `python3 tools/make_makehuman.py` fetches the MakeHuman body (CC0) and `tools/run_benchmark.sh out all lbs makehuman` scores it.
 
 ## Working in this repo
 

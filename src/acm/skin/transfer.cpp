@@ -67,6 +67,30 @@ void requireSkinnedSource(const Mesh& source) {
     }
 }
 
+// Steps between two joints along the hierarchy (parent/child hops), or a
+// large number when they share no ancestor.
+int kinDistance(const Eigen::VectorXi& parent, int a, int b) {
+    if (a == b) {
+        return 0;
+    }
+    if (parent.size() == 0 || a < 0 || b < 0) {
+        return 1 << 20;
+    }
+    std::vector<int> depthA;
+    for (int j = a; j >= 0; j = parent(j)) {
+        depthA.push_back(j);
+    }
+    int stepsB = 0;
+    for (int j = b; j >= 0; j = parent(j), ++stepsB) {
+        for (size_t k = 0; k < depthA.size(); ++k) {
+            if (depthA[k] == j) {
+                return static_cast<int>(k) + stepsB;
+            }
+        }
+    }
+    return 1 << 20;
+}
+
 }  // namespace
 
 TransferResult transferClosestPoint(const Mesh& source, const Mesh& target, const TransferParams&) {
@@ -211,7 +235,7 @@ InpaintSetup prepareInpaint(const Mesh& source, const Mesh& target, const Transf
         // M8: the region is grown nearest-first and stops when a third dominant
         // bone appears, so it never spans more than one joint.
         std::vector<int> dominant(n, -1);
-        if (params.blendJointCap || params.lengthCap > 0.0) {
+        if (params.blendJointCap || params.lengthCap > 0.0 || params.blendKinSteps > 0) {
             for (int i = 0; i < n; ++i) {
                 if (s.matched(i)) {
                     s.cp.W.row(i).maxCoeff(&dominant[i]);
@@ -242,6 +266,10 @@ InpaintSetup prepareInpaint(const Mesh& source, const Mesh& target, const Transf
                 const int v = queue.top().second;
                 queue.pop();
                 if (s.matched(v)) {
+                    if (params.blendKinSteps > 0 && v != seed &&
+                        kinDistance(params.jointParent, dominant[seed], dominant[v]) > params.blendKinSteps) {
+                        continue;  // another limb's bone: skip it, but keep growing through it
+                    }
                     if (params.blendJointCap) {
                         const int b = dominant[v];
                         if (bonesSeen[0] < 0 || bonesSeen[0] == b) {
@@ -256,7 +284,11 @@ InpaintSetup prepareInpaint(const Mesh& source, const Mesh& target, const Transf
                     ++count;
                 }
                 for (int nb : adjacency[v]) {
-                    const double d = (target.V.row(seed) - target.V.row(nb)).norm();
+                    // M10: measure on the body, so the region follows the limb
+                    // under the garment instead of the garment's own surface.
+                    const double d = params.blendOnBody && s.matched(nb)
+                                         ? (s.cp.C.row(seed) - s.cp.C.row(nb)).norm()
+                                         : (target.V.row(seed) - target.V.row(nb)).norm();
                     if (seen[nb] != seed && d < radius) {
                         seen[nb] = seed;
                         queue.emplace(d, nb);
@@ -511,11 +543,36 @@ TransferResult runTransfer(const std::string& method, const Mesh& source, const 
         }
         return transferAnchored(source, target, p);
     }
+    if (method == "kinblend") {
+        if (params.jointParent.size() == 0) {
+            throw std::runtime_error("kinblend needs the joint hierarchy (a rigged source)");
+        }
+        TransferParams p = params;
+        p.relativeMatch = true;
+        p.consistencyCheck = true;
+        if (p.blendKinSteps <= 0) {
+            p.blendKinSteps = 2;  // parent/child plus one more hop, for rigs with twist bones (upperarm01/02)
+        }
+        if (p.offsetBlend <= 0.0) {
+            p.offsetBlend = 4.0;
+        }
+        return transferAnchored(source, target, p);
+    }
+    if (method == "bodyblend") {
+        TransferParams p = params;
+        p.relativeMatch = true;
+        p.consistencyCheck = true;
+        p.blendOnBody = true;
+        if (p.offsetBlend <= 0.0) {
+            p.offsetBlend = 4.0;
+        }
+        return transferAnchored(source, target, p);
+    }
     throw std::runtime_error("unknown transfer method: " + method);
 }
 
 std::vector<std::string> transferMethodNames() {
-    return {"closest", "inpaint", "bounded", "anchored", "relative", "consistent", "offsetblend", "jointcap", "lengthcap"};
+    return {"closest", "inpaint", "bounded", "anchored", "relative", "consistent", "offsetblend", "jointcap", "lengthcap", "bodyblend", "kinblend"};
 }
 
 Eigen::MatrixXd pruneInfluences(const Eigen::MatrixXd& W, int maxInfluences) {

@@ -25,6 +25,9 @@ struct TransferParams {
     bool blendJointCap = false;      // jointcap: stop the blend region once it spans more than two dominant bones
     double lengthCap = 0.0;          // lengthcap: blend radius at most this fraction of the dominant bone's length (0 = off)
     Eigen::VectorXd boneLength;      // one per joint, from boneLengths(); needed by lengthcap
+    bool blendOnBody = false;        // bodyblend: grow the blend region by distance between closest body points, not garment vertices
+    int blendKinSteps = 0;           // kinblend: only average neighbours whose dominant bone is within this many parent/child steps (0 = off)
+    Eigen::VectorXi jointParent;     // one per joint, -1 for a root; needed by kinblend
 };
 
 struct TransferResult {
@@ -61,8 +64,8 @@ TransferResult transferAnchored(const Mesh& source, const Mesh& target, const Tr
 
 // M7: consistent, plus each matched vertex's copied weights are averaged over
 // a radius proportional to its distance from the body, so a loose garment
-// blends across a joint over a wider region than the skin. Current default
-// method; the default scale is 4. (method name "offsetblend")
+// blends across a joint over a wider region than the skin. The default scale
+// is 4. (method name "offsetblend")
 
 // M8: offsetblend, with the blend region grown outward by distance and cut
 // off as soon as it would take in a third dominant bone, so a large scale
@@ -72,8 +75,18 @@ TransferResult transferAnchored(const Mesh& source, const Mesh& target, const Tr
 // of the vertex's dominant bone, so the region cannot reach past the next
 // joint however far the garment sits from the body. (method name "lengthcap")
 
+// M10: offsetblend, with the region measured between the vertices' closest
+// body points rather than between the garment vertices, so a sleeve and a
+// shirt side that touch at the armpit do not blend into each other.
+// (method name "bodyblend")
+
+// M10b: offsetblend, averaging only over neighbours whose dominant bone is
+// the seed's own, its parent or its child, so the region cannot take in a
+// bone from another limb however close the surfaces are. Current default
+// method. (method name "kinblend")
+
 // Dispatch by name ("closest", "inpaint", "bounded", "anchored", "relative",
-// "consistent", "offsetblend", "jointcap", "lengthcap"); throws on an unknown name.
+// "consistent", "offsetblend", "jointcap", "lengthcap", "bodyblend", "kinblend"); throws on an unknown name.
 TransferResult runTransfer(const std::string& method, const Mesh& source, const Mesh& target,
                            const TransferParams& params);
 std::vector<std::string> transferMethodNames();
