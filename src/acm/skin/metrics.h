@@ -2,6 +2,8 @@
 
 #include "acm/skin/rig.h"
 
+#include <vector>
+
 namespace acm::skin {
 
 // How a garment behaves in one pose, given the posed body and garment. Depths
@@ -17,6 +19,28 @@ struct PoseMetrics {
     double tornFraction = 0.0;          // share of edges stretched or shrunk by more than 100%
     double offsetDrift = 0.0;           // mean change in garment-to-body distance from rest
 };
+
+// Which body vertices a garment covers in rest, for the exposure score:
+// a body vertex is covered when it lies on the inner side of the garment
+// surface (pseudonormal sign of its closest garment point), skipping
+// vertices whose closest garment face touches the garment boundary, where
+// the side is undefined. `flip` records the garment's winding so the
+// score does not depend on which way its normals point.
+struct Coverage {
+    std::vector<char> covered;    // per body vertex
+    std::vector<char> boundary;   // per garment face: touches the garment boundary
+    bool flip = false;
+    int count = 0;                // covered vertices
+};
+
+Coverage coverage(const Mesh& bodyRest, const Mesh& garmentRest);
+
+// Share of the covered body vertices that are on the outer side of the posed
+// garment: a leg swung out through a stiff skirt, which the penetration
+// score (garment vertices inside the body) barely sees. Vertices whose
+// closest posed face touches the boundary are skipped, as in rest.
+double exposureFraction(const Coverage& cover, const Eigen::MatrixXd& bodyPosed, const Mesh& garmentRest,
+                        const Eigen::MatrixXd& garmentPosed);
 
 PoseMetrics evaluatePose(const Mesh& bodyRest, const Eigen::MatrixXd& bodyPosed, const Mesh& garmentRest,
                          const Eigen::MatrixXd& garmentPosed);

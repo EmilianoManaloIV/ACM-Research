@@ -3,6 +3,7 @@
 #include <igl/bounding_box_diagonal.h>
 #include <igl/cotmatrix.h>
 #include <igl/edges.h>
+#include <igl/is_border_vertex.h>
 #include <igl/signed_distance.h>
 
 #include <algorithm>
@@ -24,6 +25,16 @@ Eigen::VectorXd signedDistances(const Eigen::MatrixXd& P, const Eigen::MatrixXd&
     return S;
 }
 
+// Pseudonormal signed distance of each point to an open mesh: the sign is
+// the side of the closest point's (angle-weighted) normal, which is defined
+// for open surfaces where the winding number is not. Also returns the
+// closest face.
+void pseudonormalDistances(const Eigen::MatrixXd& P, const Eigen::MatrixXd& V, const Eigen::MatrixXi& F,
+                           Eigen::VectorXd& S, Eigen::VectorXi& I) {
+    Eigen::MatrixXd C, N;
+    igl::signed_distance(P, V, F, igl::SIGNED_DISTANCE_TYPE_PSEUDONORMAL, S, I, C, N);
+}
+
 double percentile(std::vector<double> values, double p) {
     if (values.empty()) {
         return 0.0;
@@ -36,6 +47,60 @@ double percentile(std::vector<double> values, double p) {
 }
 
 }  // namespace
+
+Coverage coverage(const Mesh& bodyRest, const Mesh& garmentRest) {
+    Coverage cover;
+    const std::vector<bool> border = igl::is_border_vertex(garmentRest.F);
+    cover.boundary.assign(garmentRest.F.rows(), 0);
+    for (int f = 0; f < garmentRest.F.rows(); ++f) {
+        for (int k = 0; k < 3; ++k) {
+            if (border[garmentRest.F(f, k)]) {
+                cover.boundary[f] = 1;
+            }
+        }
+    }
+    Eigen::VectorXd S;
+    Eigen::VectorXi I;
+    pseudonormalDistances(bodyRest.V, garmentRest.V, garmentRest.F, S, I);
+    // Orientation: of the body vertices near the garment, more should be on
+    // its inner side than its outer side; if not, the normals point inward.
+    const double near = 0.05 * igl::bounding_box_diagonal(bodyRest.V);
+    int innerSide = 0, outerSide = 0;
+    for (int i = 0; i < S.size(); ++i) {
+        if (cover.boundary[I(i)] || std::abs(S(i)) > near) {
+            continue;
+        }
+        (S(i) < 0.0 ? innerSide : outerSide) += 1;
+    }
+    cover.flip = outerSide > innerSide;
+    cover.covered.assign(S.size(), 0);
+    for (int i = 0; i < S.size(); ++i) {
+        const double s = cover.flip ? -S(i) : S(i);
+        if (!cover.boundary[I(i)] && s < 0.0) {
+            cover.covered[i] = 1;
+            ++cover.count;
+        }
+    }
+    return cover;
+}
+
+double exposureFraction(const Coverage& cover, const Eigen::MatrixXd& bodyPosed, const Mesh& garmentRest,
+                        const Eigen::MatrixXd& garmentPosed) {
+    if (cover.count == 0) {
+        return 0.0;
+    }
+    Eigen::VectorXd S;
+    Eigen::VectorXi I;
+    pseudonormalDistances(bodyPosed, garmentPosed, garmentRest.F, S, I);
+    int exposed = 0;
+    for (int i = 0; i < S.size(); ++i) {
+        const double s = cover.flip ? -S(i) : S(i);
+        if (cover.covered[i] && !cover.boundary[I(i)] && s > 0.0) {
+            ++exposed;
+        }
+    }
+    return static_cast<double>(exposed) / cover.count;
+}
 
 PoseMetrics evaluatePose(const Mesh& bodyRest, const Eigen::MatrixXd& bodyPosed, const Mesh& garmentRest,
                          const Eigen::MatrixXd& garmentPosed) {

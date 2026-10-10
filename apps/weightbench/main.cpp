@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
             }
             csv << "garment,method,pose,penetration_fraction,penetration_mean_depth,penetration_max_depth,"
                    "stretch_p95,stretch_max,stretch_mean,torn_fraction,offset_drift,matched_fraction,seconds,dirichlet,min_weight,max_weight,"
-                   "row_sum_error,max_influences,over_limit_fraction\n";
+                   "row_sum_error,max_influences,over_limit_fraction,exposure_fraction\n";
         }
         const std::string garmentName = baseName(options.garment);
 
@@ -234,7 +234,7 @@ int main(int argc, char** argv) {
                 // A method that cannot handle a garment is a result worth recording.
                 std::printf("%-10s FAILED: %s\n", method.c_str(), e.what());
                 if (csv) {
-                    csv << garmentName << ',' << method << ",failed,,,,,,,,,,,,,,,,\n";
+                    csv << garmentName << ',' << method << ",failed,,,,,,,,,,,,,,,,,\n";
                 }
                 continue;
             }
@@ -263,7 +263,7 @@ int main(int argc, char** argv) {
             if (csv) {
                 csv << garmentName << ',' << method << ",weights,,,,,,,,," << matchedFraction << ',' << result.seconds
                     << ',' << wm.dirichlet << ',' << wm.minWeight << ',' << wm.maxWeight << ',' << wm.maxRowSumError
-                    << ',' << wm.maxInfluences << ',' << wm.overLimitFraction << '\n';
+                    << ',' << wm.maxInfluences << ',' << wm.overLimitFraction << ",\n";
             }
             if (!options.savePosed.empty()) {
                 std::ofstream mask(options.savePosed + "/" + garmentName + "." + method + ".matched.csv");
@@ -281,6 +281,8 @@ int main(int argc, char** argv) {
 
             double worstPenetration = 0.0;
             double worstStretch = 0.0;
+            double worstExposure = 0.0;
+            const Coverage cover = poses.empty() ? Coverage{} : coverage(rig.body, garment);
             for (const Pose& pose : poses) {
                 const std::vector<Eigen::Matrix4d> matrices = skinningMatrices(rig.skeleton, pose);
                 const Eigen::MatrixXd bodyPosed = skin(rig.body.V, rig.body.W, matrices, options.skinning);
@@ -291,18 +293,20 @@ int main(int argc, char** argv) {
                     writeOBJ(stem + ".garment.obj", garmentPosed, garment.F);
                     writeOBJ(stem + ".body.obj", bodyPosed, rig.body.F);
                 }
+                const double exposure = exposureFraction(cover, bodyPosed, garment, garmentPosed);
                 worstPenetration = std::max(worstPenetration, pm.penetrationFraction);
                 worstStretch = std::max(worstStretch, pm.stretchP95);
+                worstExposure = std::max(worstExposure, exposure);
                 if (csv) {
                     csv << garmentName << ',' << method << ',' << pose.name << ',' << pm.penetrationFraction << ','
                         << pm.penetrationMeanDepth << ',' << pm.penetrationMaxDepth << ',' << pm.stretchP95 << ','
                         << pm.stretchMax << ',' << pm.stretchMean << ',' << pm.tornFraction << ',' << pm.offsetDrift
-                        << ",,,,,,,,\n";
+                        << ",,,,,,,," << exposure << "\n";
                 }
             }
             if (!poses.empty()) {
-                std::printf("%-10s worst pose: penetration %.1f%% of vertices, stretch p95 %.3f\n", method.c_str(),
-                            100.0 * worstPenetration, worstStretch);
+                std::printf("%-10s worst pose: penetration %.1f%% of vertices, stretch p95 %.3f, exposure %.1f%% of %d covered\n",
+                            method.c_str(), 100.0 * worstPenetration, worstStretch, 100.0 * worstExposure, cover.count);
             }
         }
     } catch (const std::exception& e) {
