@@ -18,7 +18,7 @@ Cases written (body glTF, garment OBJs, poses JSON):
           skirt.obj          cone from the waist to above the knees (crosses between the legs)
           dress.obj          long cone to the ankles
 
-Needs: pip install numpy trimesh pygltflib
+Needs: pip install numpy pygltflib
 """
 
 import json
@@ -28,7 +28,6 @@ import sys
 
 import numpy as np
 import pygltflib
-import trimesh
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                                         "data", "synthetic")
@@ -36,23 +35,50 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path
 
 # --- geometry helpers --------------------------------------------------------
 
-def capsule(p0, p1, radius, sections=24):
-    """Closed capsule from p0 to p1."""
+def capsule(p0, p1, radius, sections=24, ring_spacing=None):
+    """Closed capsule from p0 to p1, as rings of `sections` vertices spaced
+    about `ring_spacing` (default half the radius) along the whole length,
+    caps included, so skin weights can blend along it. (The first version
+    used trimesh capsules, whose cylinder has only its two end rings; the
+    joints of those bodies were hard-skinned by accident.)"""
     p0, p1 = np.asarray(p0, float), np.asarray(p1, float)
     height = np.linalg.norm(p1 - p0)
-    m = trimesh.creation.capsule(height=height, radius=radius, count=[sections, sections // 2])
-    # trimesh capsules run along +z from z=0; aim it at p1 - p0.
-    z = np.array([0.0, 0.0, 1.0])
+    spacing = ring_spacing or radius / 2
+    # Profile (distance along axis, radius): bottom cap, straight part, top cap.
+    cap_steps = max(2, int(np.ceil(np.pi / 2 * radius / spacing)))
+    profile = []
+    for a in np.linspace(-np.pi / 2, 0, cap_steps, endpoint=False)[1:]:
+        profile.append((radius * np.sin(a), radius * np.cos(a)))
+    for t in np.linspace(0, height, max(2, int(np.ceil(height / spacing)) + 1)):
+        profile.append((t, radius))
+    for a in np.linspace(0, np.pi / 2, cap_steps, endpoint=False)[1:]:
+        profile.append((height + radius * np.sin(a), radius * np.cos(a)))
     d = (p1 - p0) / height
-    axis = np.cross(z, d)
-    s = np.linalg.norm(axis)
-    if s < 1e-9:
-        R = np.eye(3) if d[2] > 0 else np.diag([1.0, -1.0, -1.0])
-    else:
-        angle = np.arctan2(s, np.dot(z, d))
-        R = trimesh.transformations.rotation_matrix(angle, axis / s)[:3, :3]
-    V = m.vertices @ R.T + p0
-    return V, m.faces.copy()
+    up = np.array([0.0, 1.0, 0.0]) if abs(d[1]) < 0.9 else np.array([1.0, 0.0, 0.0])
+    u = np.cross(d, up)
+    u /= np.linalg.norm(u)
+    w = np.cross(d, u)
+    V = [p0 - radius * d]  # bottom pole
+    for t, r in profile:
+        for k in range(sections):
+            a = 2 * np.pi * k / sections
+            V.append(p0 + t * d + r * (np.cos(a) * u + np.sin(a) * w))
+    top = len(V)
+    V.append(p1 + radius * d)  # top pole
+    F = []
+    n = len(profile)
+    for k in range(sections):
+        F.append([0, 1 + (k + 1) % sections, 1 + k])
+    for i in range(n - 1):
+        for k in range(sections):
+            a, b = 1 + i * sections + k, 1 + i * sections + (k + 1) % sections
+            c, e = a + sections, b + sections
+            F.append([a, b, c])
+            F.append([b, e, c])
+    for k in range(sections):
+        a = 1 + (n - 1) * sections
+        F.append([top, a + k, a + (k + 1) % sections])
+    return np.array(V), np.array(F)
 
 
 def tube(path, radii, sections=32, rings_per_segment=8, closed_top=False, closed_bottom=False):
@@ -137,11 +163,16 @@ def chain_weights(V, joints, falloff):
             if best is None or d < best[0]:
                 best = (d, j, c, t, np.linalg.norm(ab))
         _, j, c, t, length = best
-        # Ramp into the child bone near the far joint, when the child has a bone of its own.
-        s = (t * length - (length - falloff)) / (2 * falloff) + 0.5 if children[c] else 0.0
-        s = float(np.clip(s, 0.0, 1.0))
-        W[i, j] += 1.0 - s
-        W[i, c] += s
+        # Blend 0 to 1 over a ramp of 2 * falloff centred on each joint that
+        # has a bone on both sides: into the child bone near the far joint,
+        # and into the parent bone near the near joint.
+        s_end = float(np.clip(0.5 - (1.0 - t) * length / (2 * falloff), 0.0, 0.5)) if children[c] else 0.0
+        p = joints[j][1]
+        s_start = float(np.clip(0.5 - t * length / (2 * falloff), 0.0, 0.5)) if p >= 0 and children[p] else 0.0
+        W[i, j] += 1.0 - s_end - s_start
+        W[i, c] += s_end
+        if s_start > 0.0:
+            W[i, p] += s_start
     return W
 
 

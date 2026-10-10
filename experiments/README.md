@@ -6,6 +6,8 @@ Each experiment keeps its own `README.md` with the hypothesis, method and result
 
 ## Log
 
+Rows up to and including skinning-model were measured on synthetic body v1 (hard-skinned joints, see synthetic-body-v2); later rows use body v2.
+
 | Date | Experiment | Status | Outcome |
 |------|------------|--------|---------|
 | 2026-10-10 | [weight-transfer-baselines](2026-10-10-weight-transfer-baselines) | done | Benchmark set up; closest point and Epic inpainting scored on 6 synthetic garments |
@@ -15,3 +17,4 @@ Each experiment keeps its own `README.md` with the hypothesis, method and result
 | 2026-10-10 | [consistency-check](2026-10-10-consistency-check) | done | Drops matches where the closest point jumps between legs; first method to beat both baselines on the skirt; kept as default |
 | 2026-10-10 | [offset-blend](2026-10-10-offset-blend) | done, not adopted | Wider blend on loose garments increases LBS collapse at the elbow; the limit is the skinning model, not the weights |
 | 2026-10-10 | [skinning-model](2026-10-10-skinning-model) | done | Benchmark scores under LBS and DQS; DQS punishes the wide blends LBS rewarded; synthetic bodies found to be hard-skinned at the joints |
+| 2026-10-10 | [synthetic-body-v2](2026-10-10-synthetic-body-v2) | done | Bodies regenerated with ringed capsules and a centred blend; every method re-run under LBS and DQS; skirt call stands, dress call flips to closest point, offset blend works under DQS |
