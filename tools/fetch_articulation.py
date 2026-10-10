@@ -3,6 +3,7 @@ Articulation-XL2.0, filtered and converted for bodybench.
 
   python3 tools/fetch_articulation.py select DATA LIST.csv
   python3 tools/fetch_articulation.py convert DATA LIST.csv OUT [--weld]
+  python3 tools/fetch_articulation.py select-topology DATA OLD.csv LIST.csv
 
 DATA holds the downloads (see data/README.md):
   articulation-xl2/meta.csv                    the dataset's metadata
@@ -35,6 +36,33 @@ meshes at UV seams, and some are unindexed triangle soups) and drops faces
 that collapse. Merged vertices get the mean of their artist weights; the
 largest disagreement is printed. This is a mesh clean-up, so under the
 protocol it must be applied to every method and logged as a deviation.
+
+select-topology (experiment 2026-10-10-auto-weight-baselines-v2) groups by
+skeleton instead of label, and sizes the welded mesh. It writes two sets:
+
+  same   the characters in OLD.csv, except c84ca8a7 (dropped by the
+         director), regrouped
+  fresh  the first 5 of each group in ascending uuid order among the other
+         models of the test split whose label names a living thing
+         (character, animal, mythical creature, anthropomorphic, humanoid)
+
+Both keep only CC-BY or CC0 models with 10 to 150 joints and 1,000 to 100,000
+vertices after welding. The groups:
+
+  limb pair  two children of the same joint whose subtrees have the same
+             number of joints and whose reach (largest distance from that
+             joint to a joint in the subtree) differs by at most 10%
+  limb skin  the vertices whose largest artist weight belongs to a joint of
+             the limb's subtree
+  leg pair   seen along one of the six axis directions, a limb pair whose
+             two lowest joints both lie in the lowest 15% of the mesh's
+             extent, at least 5% of the bounding-box diagonal apart, and each
+             at least 10% of the diagonal below the joint the pair hangs from
+  quadruped  2 leg pairs
+  biped      1 leg pair and at least 2 limb pairs; or no leg pair by joints
+             but 1 by skin (the lowest vertices of each limb's skin standing
+             in for its lowest joints), for rigs that stop at the ankle
+  other      the rest
 
 The dataset ships as a pickled NumPy array, so loading it runs pickle. Only
 load files downloaded from the dataset's own Hugging Face repository.
@@ -135,6 +163,153 @@ def select(data, out):
                 w.writerow([group, r.uuid, r.category_label, r.license, r.source, r.vertex_count, r.joint_count,
                             r.fileIdentifier])
             print(f"{group}: {len(rows)}")
+
+
+LIVING = {"character", "animal", "mythical creature", "anthropomorphic", "humanoid"}
+DROPPED = {"c84ca8a774b142788dfd403ca139e4a0"}  # director, 2026-10-10
+
+
+def limb_pairs(d):
+    _, children = tree(d)
+    J = d["joints"]
+    pairs = []
+    for p in range(len(J)):
+        info = []
+        for c in children[p]:
+            sub = [c]
+            k = 0
+            while k < len(sub):
+                sub += children[sub[k]]
+                k += 1
+            if len(sub) >= 2:
+                info.append((len(sub), max(float(np.linalg.norm(J[s] - J[p])) for s in sub), sub, p))
+        used = set()
+        for i, a in enumerate(info):
+            if i in used:
+                continue
+            for k in range(i + 1, len(info)):
+                b = info[k]
+                if k not in used and a[0] == b[0] and abs(a[1] - b[1]) <= 0.1 * max(a[1], b[1]):
+                    used |= {i, k}
+                    pairs.append((a[2], b[2], p))
+                    break
+    return pairs
+
+
+def count_leg_pairs(d, lowest_points):
+    """Largest number of leg pairs over the six axis directions. lowest_points
+    maps (pair, axis, sign) to the two points that stand for the pair's feet."""
+    V, J = d["vertices"], d["joints"]
+    diag = float(np.linalg.norm(V.max(0) - V.min(0)))
+    pairs = limb_pairs(d)
+    best = 0
+    for axis in range(3):
+        for sign in (1, -1):
+            h = sign * V[:, axis]
+            lo, extent = h.min(), h.max() - h.min()
+            n = 0
+            for pair in pairs:
+                feet = lowest_points(pair, axis, sign)
+                if feet is None:
+                    continue
+                pa, pb = feet
+                top = sign * J[pair[2], axis]
+                ha, hb = sign * pa[axis], sign * pb[axis]
+                if (ha - lo < 0.15 * extent and hb - lo < 0.15 * extent
+                        and np.linalg.norm(pa - pb) > 0.05 * diag
+                        and top - ha > 0.1 * diag and top - hb > 0.1 * diag):
+                    n += 1
+            best = max(best, n)
+    return best, len(pairs)
+
+
+def body_plan(d):
+    J = d["joints"]
+
+    def by_joint(pair, axis, sign):
+        a, b, _ = pair
+        return (J[min(a, key=lambda s: sign * J[s, axis])], J[min(b, key=lambda s: sign * J[s, axis])])
+
+    legs, n_pairs = count_leg_pairs(d, by_joint)
+    if legs == 2:
+        return "quadruped", 4, n_pairs
+    if legs == 1 and n_pairs >= 2:
+        return "biped", 2, n_pairs
+    if legs == 0:
+        # Some rigs stop at the ankle or knee, so no joint reaches the ground.
+        # Their skin does: a limb's skin is the vertices whose largest artist
+        # weight belongs to the limb. Used only to find bipeds, since hanging
+        # arms also reach low and would make false quadrupeds.
+        V = d["vertices"]
+        owner = np.argmax(artist_weights(d), axis=1)
+
+        def by_skin(pair, axis, sign):
+            a, b, _ = pair
+            va, vb = V[np.isin(owner, a)], V[np.isin(owner, b)]
+            if not len(va) or not len(vb):
+                return None
+            return va[np.argmin(sign * va[:, axis])], vb[np.argmin(sign * vb[:, axis])]
+
+        skin_legs, _ = count_leg_pairs(d, by_skin)
+        if skin_legs == 1 and n_pairs >= 2:
+            return "biped", 2, n_pairs
+    return "other", 2 * legs, n_pairs
+
+
+def select_topology(data, old, out):
+    import pandas as pd
+
+    meta = pd.read_csv(os.path.join(data, "articulation-xl2", "meta.csv"))
+    lic = pd.concat(
+        pd.read_parquet(os.path.join(data, "objaverse-xl", s, s + ".parquet"), columns=["fileIdentifier", "license"])
+        for s in ("sketchfab", "github")
+    ).drop_duplicates("fileIdentifier")
+    meta = meta.merge(lic, on="fileIdentifier", how="left").set_index("uuid")
+    split = load_split(data)
+    with open(old) as f:
+        old_ids = [r["uuid"] for r in csv.DictReader(f)]
+
+    def describe(uuid):
+        d = split[uuid]
+        welded, _, _ = weld(d, artist_weights(d))
+        plan, legs, pairs = body_plan(d)
+        return plan, legs, pairs, len(welded["vertices"])
+
+    rows = []
+    for uuid in old_ids:
+        if uuid in DROPPED:
+            continue
+        plan, legs, pairs, nv = describe(uuid)
+        if 1000 <= nv <= 100000:
+            rows.append(("same", plan, uuid, legs, pairs, nv))
+        else:
+            print(f"same: {uuid} left out, {nv} vertices after welding")
+    candidates = meta[
+        meta.index.isin(split)
+        & ~meta.index.isin(old_ids)
+        & ~meta.index.isin(DROPPED)
+        & meta.license.isin(LICENCES)
+        & meta.joint_count.between(10, 150)
+    ].sort_index()
+    taken = {"biped": 0, "quadruped": 0, "other": 0}
+    for uuid, r in candidates.iterrows():
+        tags = {t.strip() for t in str(r.category_label).lower().split(",")}
+        if not tags & LIVING:
+            continue
+        plan, legs, pairs, nv = describe(uuid)
+        if not 1000 <= nv <= 100000 or taken[plan] >= PER_GROUP:
+            continue
+        taken[plan] += 1
+        rows.append(("fresh", plan, uuid, legs, pairs, nv))
+    with open(out, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["set", "group", "uuid", "category_label", "license", "legs", "limb_pairs", "welded_vertices",
+                    "joints", "fileIdentifier"])
+        for st, plan, uuid, legs, pairs, nv in rows:
+            r = meta.loc[uuid]
+            w.writerow([st, plan, uuid, r.category_label, r.license, legs, pairs, nv, r.joint_count, r.fileIdentifier])
+    for st in ("same", "fresh"):
+        print(st, {g: sum(1 for x in rows if x[0] == st and x[1] == g) for g in taken})
 
 
 def artist_weights(d):
@@ -253,6 +428,8 @@ def convert(data, listing, out, welded=False):
 def main(argv):
     if len(argv) == 3 and argv[0] == "select":
         select(argv[1], argv[2])
+    elif len(argv) == 4 and argv[0] == "select-topology":
+        select_topology(argv[1], argv[2], argv[3])
     elif len(argv) in (4, 5) and argv[0] == "convert" and argv[4:] in ([], ["--weld"]):
         convert(argv[1], argv[2], argv[3], welded=argv[4:] == ["--weld"])
     else:

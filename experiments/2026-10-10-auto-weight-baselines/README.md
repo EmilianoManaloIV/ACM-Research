@@ -1,7 +1,7 @@
 # Experiment: auto-weight baselines on humans, quadrupeds and creatures
 
 - **Date started:** 2026-10-10
-- **Status:** run; waiting on the director for Gate D sign-off, the logged deviations, and Gate E
+- **Status:** done. Gate D passed. Gate E sent back to C by the director, who judged that run 2 does not pass H1. The confirmatory test is the amended experiment [`2026-10-10-auto-weight-baselines-v2`](../2026-10-10-auto-weight-baselines-v2).
 - **Question:** [`research/questions/RQ-002-automatic-body-weights.md`](../../research/questions/RQ-002-automatic-body-weights.md)
 - **Protocol:** [`protocol.md`](protocol.md). Run 2 follows it and is meant to be the confirmatory run, but stays provisional until the director confirms Gate D and the overnight deviations. The two welded runs are exploratory.
 - **Review:** reproduced exactly by a separate session; recommendation **revise**. See [`review.md` on PR #6](https://github.com/EmilianoManaloIV/ACM-Research/pull/6).
@@ -68,7 +68,7 @@ Two caveats from the review. Bone heat's figures on seam-split meshes aren't com
   - The stretch half of the rule cannot be evaluated, because BBW has no valid character.
 - **H2:** this run cannot test H2. The rule needs all three methods ranked in a body plan, and BBW is never valid.
 
-Whether these outcomes stand is the director's call at Gate E. The findings below change how much weight they can carry.
+**Director's decision at Gate E (2026-10-10):** "Overnight run concludes that H1 has not passed." Run 2 does not pass H1, and the amended experiment is the confirmatory test. The findings below change how much weight they can carry.
 
 ## Findings that qualify run 2
 

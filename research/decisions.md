@@ -2,6 +2,18 @@
 
 Research and architecture decisions, newest first. Each entry says what was decided, what else was considered, the evidence, and who approved it. A default method, metric, benchmark or research objective changes only through an entry here.
 
+## D-006 Body-weighting benchmark settings after the first review (2026-10-10)
+
+- **Decision:** for RQ-002 body weighting, from experiment `2026-10-10-auto-weight-baselines-v2` on:
+  - every mesh is welded (vertices at the same position merged) before any method runs;
+  - BBW runs at libigl's default of 100 active-set iterations;
+  - weights above -1e-6 count as zero before the validity check;
+  - self-intersection counts only faces that cross, not faces that touch;
+  - characters are grouped by skeleton topology (biped, quadruped, other), not by dataset label.
+- **Considered:** keeping the first protocol's settings (split meshes, 8 iterations, a -1e-9 clip, contact counted as intersection, label groups), under which the first run's self-intersection was unreadable on 3 characters and the groups did not match body plans.
+- **Evidence:** independent review on PR #6, and the exploratory welded runs in `experiments/2026-10-10-auto-weight-baselines/`.
+- **Approved by:** Emiliano (Gate C for the amended protocol). He also judged that the first run does not pass H1.
+
 ## D-005 Broaden the research to bodies and clothes of any creature (2026-10-10)
 
 - **Decision:** the research covers automatic weighting of bodies as well as clothes, for bipeds, quadrupeds and unusual creatures. RQ-001 (clothing) keeps the leg-driven hem rig in scope, uses per-pose penetration, exposure and stretch p95 as primary metrics, binds the 5% keep rule, and requires a second real human body. RQ-002 is drafted for body weighting.

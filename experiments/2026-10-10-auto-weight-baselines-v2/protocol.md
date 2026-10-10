@@ -1,10 +1,10 @@
 # Protocol: automatic body-weighting baselines, amended after review
 
-Draft for Gate C, not approved. Nothing in this folder has run. It amends [the first protocol](../2026-10-10-auto-weight-baselines/protocol.md) along the lines the independent review proposed ([`review.md` on PR #6](https://github.com/EmilianoManaloIV/ACM-Research/pull/6), suggested revision b). Everything not listed under "What changes" stays as in the first protocol, including the approved deviations (limbs-only random poses, chain bends, row normalisation, the four-leg-chain rule).
+Approved at Gate C on 2026-10-10. Frozen; later changes go under Deviations. It amends [the first protocol](../2026-10-10-auto-weight-baselines/protocol.md) along the lines the independent review proposed ([`review.md` on PR #6](https://github.com/EmilianoManaloIV/ACM-Research/pull/6), suggested revision b). Everything not listed under "What changes" stays as in the first protocol, including the approved deviations (limbs-only random poses, chain bends, row normalisation, the four-leg-chain rule).
 
 - **Question:** [`research/questions/RQ-002-automatic-body-weights.md`](../../research/questions/RQ-002-automatic-body-weights.md)
-- **Kind:** confirmatory for H1 and H2, once approved
-- **Gate C approved:** not yet
+- **Kind:** confirmatory for H1 and H2
+- **Gate C approved:** 2026-10-10, Emiliano, with the choices below (decision D-006)
 
 ## Why amend
 
@@ -45,21 +45,35 @@ Unchanged: H1 (BBW fails or degrades more than bone heat on multi-shell, non-man
    - It is also reported per group, under the chosen grouping.
    - This keeps H2 testable when BBW is valid on only a few characters.
 
-## Decisions this draft needs (director)
+## Choices made at Gate C
 
-1. **Which characters?** Every option below is affected by the exploratory runs: they showed results for the welded meshes and for BBW at 100 iterations on 3 quadrupeds, which this protocol would make the standard.
-   - **(a) The same 14 plus MakeHuman.** Results are directly comparable with run 2, but the run is less clean as a confirmation.
-   - **(b) Fresh characters.** Take the next ones by uuid order from the test split that pass the filters after welding, excluding the 14 already used. There are enough humanoids and creatures, but the test split has no further quadrupeds under the four-leg-chain rule, so the quadruped group would stay the same 4 (3 if c84ca8a7 is excluded).
-   - **(c) Both:** report the old characters and the fresh ones separately.
+1. **Characters: both sets, reported separately.**
+   - **Same:** the first experiment's dataset characters plus MakeHuman.
+   - **Fresh:** the first 5 per group, in ascending uuid order, from the rest of the test split.
+   - The exploratory runs saw the same characters, so only the fresh set is untouched by the choice of settings.
+2. **Groups by skeleton topology,** not by dataset label. The operational rule is below.
+3. **c84ca8a7 is dropped.**
 
-   Recommended: (c).
-2. **How to group?**
-   - **(a) Keep the labels.**
-   - **(b) Group by skeleton:** one pair of leg chains plus a pair of arm chains is a biped, two pairs of leg chains with no arms is a quadruped, anything else is "other". This is mechanical, but it is a new rule that would need checking against the characters by eye.
-   - **(c) No groups:** per-character results only.
+Under change 7, 32623191 also leaves the same set: it has 688 vertices once welded, below the 1,000 floor.
 
-   Recommended: (c) for the claims, with (a) shown for reference.
-3. **c84ca8a7.** Keep it as a quadruped, move it, or drop it as below the size floor once welded (525 vertices)? Under change 7 it drops out on its own.
+### Grouping rule
+
+Written into `tools/fetch_articulation.py select-topology`, with the list committed as [`characters.csv`](characters.csv) before any run.
+
+- **Limb pair:** two children of the same joint whose subtrees have the same number of joints, and whose reach (the largest distance from that joint to a joint in the subtree) differs by at most 10%.
+- **Leg pair:** seen along one of the six axis directions, a limb pair where:
+  - both lowest joints lie in the lowest 15% of the mesh's extent;
+  - they are at least 5% of the bounding-box diagonal apart;
+  - each is at least 10% of the diagonal below the joint the pair hangs from.
+
+  The count is the largest over the six directions.
+- **Quadruped:** 2 leg pairs.
+- **Biped:** 1 leg pair and at least 2 limb pairs. A rig with no leg pair by joints but 1 by skin also counts: the lowest vertex of each limb's skin (the vertices whose largest artist weight belongs to the limb) stands in for its lowest joint. That covers rigs that stop at the ankle or knee. Skin is used only to find bipeds, because hanging arms also reach low.
+- **Other:** everything else.
+- **Fresh candidates:** models whose label names a living thing (character, animal, mythical creature, anthropomorphic or humanoid) and that pass the licence, joint and welded-size filters.
+- **MakeHuman** is a biped by construction.
+
+**Known errors.** The rule has no access to bone names, but names are a useful check. Under it, three fresh characters land in "other" although their bone names say biped: a5ed8e22 (rigify thigh/shin), ba707933 (arm and leg joints), and c5ec6938 (Mixamo). The likely cause is that their hanging arms or missing feet defeat the leg test. They stay where the rule puts them, because the list was fixed before the run, and they are flagged in the results. Group-level figures are descriptive only. The claims rest on per-character results.
 
 ## Decision rules
 
