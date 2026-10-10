@@ -27,10 +27,19 @@ run_one() {  # name group body [artist.csv]
     echo "$name: Blender failed, see $dir/blender.log"
   fi
   grep "bone heat:" "$dir/blender.log" || true
-  "$BENCH" "$@" --poses "$dir/poses.json" --pose-set test,named --character "$name" \
-    --method "artist,floor,bbw,csv:bone_heat=$dir/bone_heat.csv" --save-weights "$dir" \
+  common="--poses $dir/poses.json --pose-set test,named --character $name --save-weights $dir"
+  "$BENCH" "$@" $common --method "artist,floor,csv:bone_heat=$dir/bone_heat.csv" \
     --out "$dir/results.csv" > "$dir/bodybench.log" 2>&1 || echo "$name: bodybench failed, see $dir/bodybench.log"
-  grep -E "^(artist|floor|bbw|bone_heat) " "$dir/bodybench.log" | sed "s/^/$name /" || true
+  # BBW in its own process: TetGen can crash on self-intersecting input, and
+  # that is a BBW failure, not a reason to lose the other methods' rows.
+  if "$BENCH" "$@" $common --method bbw --out "$dir/bbw.csv" > "$dir/bbw.log" 2>&1; then
+    tail -n +2 "$dir/bbw.csv" >> "$dir/results.csv"
+  else
+    code=$?
+    echo "$name,bbw,weights,lbs,0,,,,,,,,,,,,\"bodybench exited with status $code (TetGen crashed)\"" >> "$dir/results.csv"
+    echo "bbw        valid 0  crashed with status $code" >> "$dir/bbw.log"
+  fi
+  grep -hE "^(artist|floor|bbw|bone_heat) " "$dir/bodybench.log" "$dir/bbw.log" | sed "s/^/$name /" || true
   echo "$group" > "$dir/group.txt"
 }
 

@@ -5,6 +5,8 @@
 #include <igl/copyleft/tetgen/tetrahedralize.h>
 
 #include <algorithm>
+#include <array>
+#include <map>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -130,16 +132,30 @@ AutoWeightResult boundedBiharmonicWeights(const Mesh& body, const std::vector<Bo
 
     Eigen::MatrixXd TV;
     Eigen::MatrixXi TT, TF;
-    // p: tetrahedralise the surface; q: quality; Y: keep the surface as given,
-    // so the first n output vertices are the input vertices in order.
+    // p: tetrahedralise the surface; q: quality; Y: keep the surface as given.
     const int status = igl::copyleft::tetgen::tetrahedralize(V, body.F, "pq1.414Y", TV, TT, TF);
     if (status != 0) {
         result.note = "tetgen failed with status " + std::to_string(status);
         return result;
     }
-    if (TV.rows() < n || !TV.topRows(n).isApprox(body.V)) {
-        result.note = "tetgen reordered or dropped surface vertices";
-        return result;
+    // TetGen keeps input points first, but merges coincident ones (meshes
+    // split at UV seams have many), so find each surface vertex's tet vertex
+    // by position. One with no match was dropped, and the solve has no value
+    // for it.
+    std::vector<int> tetOf(n, -1);
+    {
+        std::map<std::array<double, 3>, int> at;
+        for (int i = 0; i < TV.rows(); ++i) {
+            at.emplace(std::array<double, 3>{TV(i, 0), TV(i, 1), TV(i, 2)}, i);
+        }
+        for (int i = 0; i < n; ++i) {
+            const auto it = at.find({body.V(i, 0), body.V(i, 1), body.V(i, 2)});
+            if (it == at.end()) {
+                result.note = "tetgen dropped surface vertex " + std::to_string(i);
+                return result;
+            }
+            tetOf[i] = it->second;
+        }
     }
 
     Eigen::VectorXi b;
@@ -161,11 +177,13 @@ AutoWeightResult boundedBiharmonicWeights(const Mesh& body, const std::vector<Bo
 
     // Handle columns are ordered [P; BE]; map them back to joints.
     result.W = Eigen::MatrixXd::Zero(n, joints);
-    for (int k = 0; k < np; ++k) {
-        result.W.col(pointJoint[k]) += Wh.col(k).head(n);
-    }
-    for (int e = 0; e < ne; ++e) {
-        result.W.col(edgeJoint[e]) += Wh.col(np + e).head(n);
+    for (int i = 0; i < n; ++i) {
+        for (int k = 0; k < np; ++k) {
+            result.W(i, pointJoint[k]) += Wh(tetOf[i], k);
+        }
+        for (int e = 0; e < ne; ++e) {
+            result.W(i, edgeJoint[e]) += Wh(tetOf[i], np + e);
+        }
     }
     normaliseRows(result.W);
     return result;
