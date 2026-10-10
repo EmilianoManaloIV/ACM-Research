@@ -2,6 +2,9 @@
 
   python3 tools/summarize_auto_weight.py results.csv
 
+A table with a "set" column (experiment v2) is summarised one set at a time,
+with the v2 groups (biped, quadruped, other).
+
 Per character and method: whether the weights were valid, then over the
 scored poses the mean and worst stretch p95, mean self-intersection above
 rest, mean torn fraction, and mean distance from the artist-weighted pose;
@@ -24,13 +27,23 @@ def num(rows, col):
 def main(path):
     with open(path) as f:
         rows = list(csv.DictReader(f))
+    if rows and "set" in rows[0]:
+        for st in ("same", "fresh"):
+            print(f"### {st}\n")
+            summarise([r for r in rows if r["set"] == st], ["biped", "quadruped", "other"])
+            print()
+    else:
+        summarise(rows, ["humanoid", "quadruped", "creature"])
+
+
+def summarise(rows, GROUPS):
     weights = {(r["character"], r["method"]): r for r in rows if r["pose"] == "weights"}
     poses = collections.defaultdict(list)
     for r in rows:
         if r["pose"] != "weights":
             poses[(r["character"], r["method"])].append(r)
     group = {r["character"]: r["group"] for r in rows}
-    chars = sorted(group, key=lambda c: (["humanoid", "quadruped", "creature"].index(group[c]), c))
+    chars = sorted(group, key=lambda c: (GROUPS.index(group[c]), c))
 
     print("| group | character | method | valid | L1 vs artist | poses | mean p95 | worst p95 | self-int. | torn | dist. |")
     print("|---|---|---|---|---|---|---|---|---|---|---|")
@@ -58,7 +71,7 @@ def main(path):
     print("| group | characters | " + " | ".join(f"{m} failures" for m in METHODS[1:]) + " | "
           + " | ".join(f"{m} median p95" for m in METHODS) + " |")
     print("|---|---|" + "---|" * (2 * len(METHODS) - 1))
-    for g in ["humanoid", "quadruped", "creature"]:
+    for g in GROUPS:
         cs = [c for c in chars if group[c] == g]
         fails = [sum(1 for c in cs if weights.get((c, m), {}).get("valid") != "1") for m in METHODS[1:]]
         med = []

@@ -25,6 +25,11 @@
 // rest, and distance from the artist-weighted pose. A method whose weights
 // are invalid gets no pose rows: the protocol records it as a failure.
 // --score-invalid (exploratory runs only) scores them anyway, marked valid 0.
+// --negative-tolerance clips every method's weights above -tolerance to zero
+// and renormalises before the validity check (v2 uses 1e-6; without it, as in
+// the first experiment, only BBW and CSV weights get a -1e-9 clip);
+// --ignore-contact makes self-intersection count only crossing faces;
+// --method-seconds reports a run time measured elsewhere (Blender's).
 
 #include "acm/skin/autoweight.h"
 #include "acm/skin/gltf.h"
@@ -59,6 +64,9 @@ struct Options {
     int bbwSamples = 10;
     int bbwIterations = 8;
     bool scoreInvalid = false;
+    bool ignoreContact = false;
+    double negativeTolerance = 0.0;  // 0: no extra clip (the first experiment)
+    std::vector<std::pair<std::string, double>> methodSeconds;
     acm::skin::SkinningMode skinning = acm::skin::SkinningMode::LinearBlend;
 };
 
@@ -67,7 +75,8 @@ struct Options {
                  "usage: %s --body body.gltf --poses poses.json [--pose-set test,named]\n"
                  "          [--method floor,bbw,artist,csv:name=path] [--character name] [--out results.csv]\n"
                  "          [--save-weights dir] [--export-bones bones.json] [--export-mesh body.obj] [--skinning lbs|dqs] [--bbw-samples 10]\n"
-                 "          [--bbw-iterations 8] [--artist-weights artist.csv] [--score-invalid]\n",
+                 "          [--bbw-iterations 8] [--artist-weights artist.csv] [--score-invalid]\n"
+                 "          [--ignore-contact] [--negative-tolerance 1e-6] [--method-seconds name=seconds]\n",
                  argv0);
     std::exit(2);
 }
@@ -105,6 +114,14 @@ Options parseArgs(int argc, char** argv) {
         else if (a == "--export-mesh") o.exportMesh = next();
         else if (a == "--artist-weights") o.artistWeights = next();
         else if (a == "--score-invalid") o.scoreInvalid = true;
+        else if (a == "--ignore-contact") o.ignoreContact = true;
+        else if (a == "--negative-tolerance") o.negativeTolerance = std::atof(next().c_str());
+        else if (a == "--method-seconds") {
+            const std::string v = next();
+            const size_t eq = v.find('=');
+            if (eq == std::string::npos) usage(argv[0]);
+            o.methodSeconds.emplace_back(v.substr(0, eq), std::atof(v.substr(eq + 1).c_str()));
+        }
         else if (a == "--bbw-samples") o.bbwSamples = std::atoi(next().c_str());
         else if (a == "--bbw-iterations") o.bbwIterations = std::atoi(next().c_str());
         else if (a == "--skinning") {
@@ -184,7 +201,7 @@ int main(int argc, char** argv) {
         }
         const bool hasArtist = rig.body.isSkinned();
         const double scale = igl::bounding_box_diagonal(rig.body.V);
-        const double restSelf = selfIntersectionFraction(rig.body.V, rig.body.F);
+        const double restSelf = selfIntersectionFraction(rig.body.V, rig.body.F, options.ignoreContact);
         std::printf("%s: %d vertices, %d faces, %d joints, %zu poses, artist weights: %s, rest self-intersection %.4f\n",
                     options.character.c_str(), static_cast<int>(rig.body.V.rows()), static_cast<int>(rig.body.F.rows()),
                     joints, poses.size(), hasArtist ? "yes" : "no", restSelf);
@@ -242,7 +259,14 @@ int main(int argc, char** argv) {
             } else {
                 usage(argv[0]);
             }
-            const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+            double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+            for (const auto& [name, s] : options.methodSeconds) {
+                if (name == method) seconds = s;  // timed elsewhere (Blender)
+            }
+            // Clip negatives above -tolerance and renormalise, for every method.
+            if (options.negativeTolerance > 0.0 && result.W.size() > 0) {
+                normaliseRows(result.W, options.negativeTolerance);
+            }
 
             int unweighted = 0;
             const bool valid = validWeights(result.W, unweighted);
@@ -269,7 +293,7 @@ int main(int argc, char** argv) {
                     skin(rig.body.V, result.W, skinningMatrices(rig.skeleton, poses[k]), options.skinning);
                 PoseMetrics m;
                 stretchMetrics(rig.body.F, rig.body.V, posed, m);
-                const double self = selfIntersectionFraction(posed, rig.body.F) - restSelf;
+                const double self = selfIntersectionFraction(posed, rig.body.F, options.ignoreContact) - restSelf;
                 double dist = std::nan("");
                 if (hasArtist) {
                     dist = (posed - artistPosed[k]).rowwise().norm().mean() / scale;

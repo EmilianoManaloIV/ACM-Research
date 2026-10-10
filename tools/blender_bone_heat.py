@@ -10,6 +10,8 @@ weights.csv one row per vertex, one column per joint in bones.json order;
             vertices Blender leaves unweighted come out as zero rows, which
             bodybench counts as a failure
 
+The log line gives the time of the weighting call alone, in seconds.
+
 The armature gets one bone per joint, from its head to its tail as given, all
 deforming, parented as in bones.json. Nothing else is configured: this is the
 tool's default behaviour, which is what the protocol measures.
@@ -17,6 +19,7 @@ tool's default behaviour, which is what the protocol measures.
 
 import json
 import sys
+import time
 
 import bpy
 
@@ -69,7 +72,9 @@ def main(argv):
     body.select_set(True)
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
+    start = time.perf_counter()
     bpy.ops.object.parent_set(type="ARMATURE_AUTO")
+    seconds = time.perf_counter() - start
 
     names = [b["name"] for b in spec]
     column = {}
@@ -85,7 +90,8 @@ def main(argv):
         for r in rows:
             f.write(",".join(f"{w:.9g}" for w in r) + "\n")
     unweighted = sum(1 for r in rows if not any(r))
-    print(f"bone heat: {len(verts)} vertices, {len(names)} bones, {unweighted} unweighted; wrote {out_path}")
+    print(f"bone heat: {len(verts)} vertices, {len(names)} bones, {unweighted} unweighted; "
+          f"{seconds:.3f} seconds; wrote {out_path}")
 
 
 if __name__ == "__main__":

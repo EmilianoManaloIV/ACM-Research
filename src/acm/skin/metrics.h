@@ -50,7 +50,10 @@ void stretchMetrics(const Eigen::MatrixXi& F, const Eigen::MatrixXd& rest, const
 // reports the posed value minus the rest value, so a mesh that already
 // overlaps itself at rest (eyes, teeth, layered shells) is not penalised.
 // Coplanar overlap is not detected; posed skin rarely produces it.
-double selfIntersectionFraction(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
+// By default faces that only touch (across a seam, say) count as
+// intersecting; ignoreContact counts only faces that cross, with every
+// barycentric and segment parameter at least 1e-9 inside its bounds.
+double selfIntersectionFraction(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F, bool ignoreContact = false);
 
 PoseMetrics evaluatePose(const Mesh& bodyRest, const Eigen::MatrixXd& bodyPosed, const Mesh& garmentRest,
                          const Eigen::MatrixXd& garmentPosed);

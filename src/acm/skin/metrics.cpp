@@ -50,8 +50,11 @@ double percentile(std::vector<double> values, double p) {
 
 // Whether segment pq crosses triangle abc (Moller-Trumbore, with the
 // parameter limited to the segment). Coplanar contact is not counted.
+// margin 0 counts touching (a hit on an edge, a vertex or a segment end);
+// a positive margin keeps every parameter that far inside its bounds, so
+// only proper crossings count.
 bool segmentHitsTriangle(const Eigen::Vector3d& p, const Eigen::Vector3d& q, const Eigen::Vector3d& a,
-                         const Eigen::Vector3d& b, const Eigen::Vector3d& c) {
+                         const Eigen::Vector3d& b, const Eigen::Vector3d& c, double margin) {
     const Eigen::Vector3d d = q - p, e1 = b - a, e2 = c - a;
     const Eigen::Vector3d h = d.cross(e2);
     const double det = e1.dot(h);
@@ -62,23 +65,23 @@ bool segmentHitsTriangle(const Eigen::Vector3d& p, const Eigen::Vector3d& q, con
     const double inv = 1.0 / det;
     const Eigen::Vector3d sv = p - a;
     const double u = inv * sv.dot(h);
-    if (u < 0.0 || u > 1.0) {
+    if (u < margin || u > 1.0 - margin) {
         return false;
     }
     const Eigen::Vector3d qv = sv.cross(e1);
     const double v = inv * d.dot(qv);
-    if (v < 0.0 || u + v > 1.0) {
+    if (v < margin || u + v > 1.0 - margin) {
         return false;
     }
     const double t = inv * e2.dot(qv);
-    return t >= 0.0 && t <= 1.0;
+    return t >= margin && t <= 1.0 - margin;
 }
 
 // Two non-coplanar triangles intersect exactly when an edge of one crosses the other.
-bool trianglesIntersect(const Eigen::Vector3d* A, const Eigen::Vector3d* B) {
+bool trianglesIntersect(const Eigen::Vector3d* A, const Eigen::Vector3d* B, double margin) {
     for (int k = 0; k < 3; ++k) {
-        if (segmentHitsTriangle(A[k], A[(k + 1) % 3], B[0], B[1], B[2]) ||
-            segmentHitsTriangle(B[k], B[(k + 1) % 3], A[0], A[1], A[2])) {
+        if (segmentHitsTriangle(A[k], A[(k + 1) % 3], B[0], B[1], B[2], margin) ||
+            segmentHitsTriangle(B[k], B[(k + 1) % 3], A[0], A[1], A[2], margin)) {
             return true;
         }
     }
@@ -167,7 +170,8 @@ void stretchMetrics(const Eigen::MatrixXi& F, const Eigen::MatrixXd& rest, const
     }
 }
 
-double selfIntersectionFraction(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
+double selfIntersectionFraction(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F, bool ignoreContact) {
+    const double margin = ignoreContact ? 1e-9 : 0.0;
     const int nf = static_cast<int>(F.rows());
     if (nf < 2) {
         return 0.0;
@@ -218,7 +222,7 @@ double selfIntersectionFraction(const Eigen::MatrixXd& V, const Eigen::MatrixXi&
                 }
                 const Eigen::Vector3d A[3] = {V.row(F(a, 0)), V.row(F(a, 1)), V.row(F(a, 2))};
                 const Eigen::Vector3d B[3] = {V.row(F(b, 0)), V.row(F(b, 1)), V.row(F(b, 2))};
-                if (trianglesIntersect(A, B)) {
+                if (trianglesIntersect(A, B, margin)) {
                     hit[a] = hit[b] = 1;
                 }
             }
