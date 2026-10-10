@@ -1,0 +1,60 @@
+#pragma once
+
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+
+#include <string>
+#include <vector>
+
+namespace acm::skin {
+
+// A triangle mesh with optional per-vertex skin weights (one column per joint).
+struct Mesh {
+    Eigen::MatrixXd V;  // #V by 3 positions
+    Eigen::MatrixXi F;  // #F by 3 triangle indices
+    Eigen::MatrixXd W;  // #V by #joints skin weights, or empty if unskinned
+    Eigen::MatrixXd N;  // #V by 3 per-vertex normals, see computeNormals()
+
+    void computeNormals();
+    bool isSkinned() const { return W.rows() == V.rows() && W.cols() > 0; }
+};
+
+// Joint hierarchy with the transforms needed for linear blend skinning.
+struct Skeleton {
+    std::vector<std::string> names;
+    std::vector<int> parent;                   // -1 for a root joint
+    std::vector<Eigen::Matrix4d> restLocal;    // joint transform relative to its parent
+    std::vector<Eigen::Matrix4d> inverseBind;  // world-to-joint at bind time
+
+    int size() const { return static_cast<int>(names.size()); }
+    int find(const std::string& name) const;  // -1 if missing
+};
+
+// A pose is an extra rotation per joint, applied on top of the rest rotation,
+// so the identity pose reproduces the bind pose.
+struct Pose {
+    std::string name;
+    std::vector<Eigen::Quaterniond> rotation;  // one per joint
+};
+
+Pose identityPose(const Skeleton& skeleton, const std::string& name = "rest");
+
+// Per-joint matrices that take a bind-space point to its posed position:
+// G[j] * inverseBind[j], where G walks the hierarchy.
+std::vector<Eigen::Matrix4d> skinningMatrices(const Skeleton& skeleton, const Pose& pose);
+
+// Linear blend skinning on the CPU. W has one column per joint.
+Eigen::MatrixXd linearBlendSkin(const Eigen::MatrixXd& V, const Eigen::MatrixXd& W,
+                                const std::vector<Eigen::Matrix4d>& matrices);
+
+// A rigged character: the body mesh and the skeleton it is bound to.
+struct Rig {
+    Mesh body;
+    Skeleton skeleton;
+};
+
+// Weights as CSV, one row per vertex, one column per joint. Returns false on I/O error.
+bool saveWeightsCSV(const std::string& path, const Eigen::MatrixXd& W);
+bool loadWeightsCSV(const std::string& path, Eigen::MatrixXd& W);
+
+}  // namespace acm::skin

@@ -1,0 +1,214 @@
+// weightbench: transfers skin weights from a rigged body to a garment with
+// one or more methods, then scores the result over a set of poses.
+//
+// Usage:
+//   weightbench --body body.gltf --garment skirt.obj --poses poses.json [--pose-set test]
+//               [--method closest,inpaint|all] [--out results.csv] [--save-weights dir]
+//               [--prune 4] [--distance 0.05] [--angle 30] [--no-smooth]
+//
+//   weightbench --source sphere.obj --source-weights w.csv --garment grid.obj
+//               --method inpaint --save-weights dir
+//     Transfer only, with no skeleton or poses, for checking a method against
+//     a reference implementation.
+//
+// Output: one CSV row per (method, pose) with the pose metrics, plus one
+// "weights" row per method with the weight metrics and run time.
+
+#include "acm/skin/gltf.h"
+#include "acm/skin/metrics.h"
+#include "acm/skin/transfer.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <exception>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+namespace {
+
+struct Options {
+    std::string body;
+    std::string source;
+    std::string sourceWeights;
+    std::string garment;
+    std::string poses;
+    std::string poseSet = "poses";
+    std::vector<std::string> methods;
+    std::string out;
+    std::string saveWeights;
+    int prune = 0;
+    acm::skin::TransferParams params;
+};
+
+[[noreturn]] void usage(const char* argv0) {
+    std::fprintf(stderr,
+                 "usage: %s --body body.gltf --garment garment.(obj|gltf) --poses poses.json\n"
+                 "          [--pose-set name] [--method a,b|all] [--out results.csv] [--save-weights dir]\n"
+                 "          [--prune N] [--distance 0.05] [--angle 30] [--no-smooth]\n"
+                 "   or: %s --source mesh.obj --source-weights w.csv --garment mesh.obj --method m --save-weights dir\n",
+                 argv0, argv0);
+    std::exit(2);
+}
+
+std::vector<std::string> split(const std::string& s, char sep) {
+    std::vector<std::string> parts;
+    std::stringstream ss(s);
+    std::string part;
+    while (std::getline(ss, part, sep)) {
+        if (!part.empty()) {
+            parts.push_back(part);
+        }
+    }
+    return parts;
+}
+
+Options parseArgs(int argc, char** argv) {
+    Options o;
+    auto value = [&](int& i) -> const char* {
+        if (i + 1 >= argc) {
+            usage(argv[0]);
+        }
+        return argv[++i];
+    };
+    for (int i = 1; i < argc; ++i) {
+        const char* a = argv[i];
+        if (!std::strcmp(a, "--body")) o.body = value(i);
+        else if (!std::strcmp(a, "--source")) o.source = value(i);
+        else if (!std::strcmp(a, "--source-weights")) o.sourceWeights = value(i);
+        else if (!std::strcmp(a, "--garment")) o.garment = value(i);
+        else if (!std::strcmp(a, "--poses")) o.poses = value(i);
+        else if (!std::strcmp(a, "--pose-set")) o.poseSet = value(i);
+        else if (!std::strcmp(a, "--method")) o.methods = split(value(i), ',');
+        else if (!std::strcmp(a, "--out")) o.out = value(i);
+        else if (!std::strcmp(a, "--save-weights")) o.saveWeights = value(i);
+        else if (!std::strcmp(a, "--prune")) o.prune = std::atoi(value(i));
+        else if (!std::strcmp(a, "--distance")) o.params.distanceFraction = std::atof(value(i));
+        else if (!std::strcmp(a, "--angle")) o.params.angleDegrees = std::atof(value(i));
+        else if (!std::strcmp(a, "--no-smooth")) o.params.smooth = false;
+        else usage(argv[0]);
+    }
+    if (o.garment.empty() || (o.body.empty() && o.source.empty())) {
+        usage(argv[0]);
+    }
+    if (o.methods.empty() || (o.methods.size() == 1 && o.methods[0] == "all")) {
+        o.methods = acm::skin::transferMethodNames();
+    }
+    return o;
+}
+
+std::string baseName(const std::string& path) {
+    const size_t slash = path.find_last_of("/\\");
+    const std::string file = slash == std::string::npos ? path : path.substr(slash + 1);
+    const size_t dot = file.find_last_of('.');
+    return dot == std::string::npos ? file : file.substr(0, dot);
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+    const Options options = parseArgs(argc, argv);
+    using namespace acm::skin;
+    try {
+        // Source of the weights: a rigged body, or a bare mesh plus a CSV.
+        Rig rig;
+        const bool transferOnly = options.body.empty();
+        if (transferOnly) {
+            rig.body = loadMesh(options.source);
+            if (options.sourceWeights.empty() || !loadWeightsCSV(options.sourceWeights, rig.body.W)) {
+                std::fprintf(stderr, "--source needs --source-weights with one row per vertex\n");
+                return 1;
+            }
+            if (rig.body.W.rows() != rig.body.V.rows()) {
+                std::fprintf(stderr, "source weights have %d rows, mesh has %d vertices\n",
+                             static_cast<int>(rig.body.W.rows()), static_cast<int>(rig.body.V.rows()));
+                return 1;
+            }
+        } else {
+            rig = loadRig(options.body);
+        }
+        const Mesh garment = loadMesh(options.garment);
+        std::vector<Pose> poses;
+        if (!transferOnly && !options.poses.empty()) {
+            poses = loadPoses(options.poses, rig.skeleton, options.poseSet);
+        }
+        std::printf("source: %d vertices, %d joints; garment: %d vertices; %d poses\n",
+                    static_cast<int>(rig.body.V.rows()), static_cast<int>(rig.body.W.cols()),
+                    static_cast<int>(garment.V.rows()), static_cast<int>(poses.size()));
+
+        std::ofstream csv;
+        if (!options.out.empty()) {
+            csv.open(options.out);
+            if (!csv) {
+                std::fprintf(stderr, "Could not write %s\n", options.out.c_str());
+                return 1;
+            }
+            csv << "garment,method,pose,penetration_fraction,penetration_mean_depth,penetration_max_depth,"
+                   "stretch_p95,stretch_max,offset_drift,matched_fraction,seconds,dirichlet,min_weight,max_weight,"
+                   "row_sum_error,max_influences,over_limit_fraction\n";
+        }
+        const std::string garmentName = baseName(options.garment);
+
+        for (const std::string& method : options.methods) {
+            TransferResult result;
+            try {
+                result = runTransfer(method, rig.body, garment, options.params);
+            } catch (const std::exception& e) {
+                // A method that cannot handle a garment is a result worth recording.
+                std::printf("%-10s FAILED: %s\n", method.c_str(), e.what());
+                if (csv) {
+                    csv << garmentName << ',' << method << ",failed,,,,,,,,,,,,,,\n";
+                }
+                continue;
+            }
+            if (options.prune > 0) {
+                result.W = pruneInfluences(result.W, options.prune);
+            }
+            const double matchedFraction =
+                static_cast<double>(result.matched.count()) / static_cast<double>(garment.V.rows());
+            const WeightMetrics wm = evaluateWeights(garment, result.W, options.prune > 0 ? options.prune : 4);
+            std::printf("%-10s matched %5.1f%%  %.3fs  dirichlet %.4g  weights [%.3f, %.3f]  rowsum err %.1e  "
+                        "max influences %d\n",
+                        method.c_str(), 100.0 * matchedFraction, result.seconds, wm.dirichlet, wm.minWeight,
+                        wm.maxWeight, wm.maxRowSumError, wm.maxInfluences);
+            if (csv) {
+                csv << garmentName << ',' << method << ",weights,,,,,,," << matchedFraction << ',' << result.seconds
+                    << ',' << wm.dirichlet << ',' << wm.minWeight << ',' << wm.maxWeight << ',' << wm.maxRowSumError
+                    << ',' << wm.maxInfluences << ',' << wm.overLimitFraction << '\n';
+            }
+            if (!options.saveWeights.empty()) {
+                const std::string path = options.saveWeights + "/" + garmentName + "." + method + ".csv";
+                if (!saveWeightsCSV(path, result.W)) {
+                    std::fprintf(stderr, "Could not write %s\n", path.c_str());
+                    return 1;
+                }
+            }
+
+            double worstPenetration = 0.0;
+            double worstStretch = 0.0;
+            for (const Pose& pose : poses) {
+                const std::vector<Eigen::Matrix4d> matrices = skinningMatrices(rig.skeleton, pose);
+                const Eigen::MatrixXd bodyPosed = linearBlendSkin(rig.body.V, rig.body.W, matrices);
+                const Eigen::MatrixXd garmentPosed = linearBlendSkin(garment.V, result.W, matrices);
+                const PoseMetrics pm = evaluatePose(rig.body, bodyPosed, garment, garmentPosed);
+                worstPenetration = std::max(worstPenetration, pm.penetrationFraction);
+                worstStretch = std::max(worstStretch, pm.stretchP95);
+                if (csv) {
+                    csv << garmentName << ',' << method << ',' << pose.name << ',' << pm.penetrationFraction << ','
+                        << pm.penetrationMeanDepth << ',' << pm.penetrationMaxDepth << ',' << pm.stretchP95 << ','
+                        << pm.stretchMax << ',' << pm.offsetDrift << ",,,,,,,,\n";
+                }
+            }
+            if (!poses.empty()) {
+                std::printf("%-10s worst pose: penetration %.1f%% of vertices, stretch p95 %.3f\n", method.c_str(),
+                            100.0 * worstPenetration, worstStretch);
+            }
+        }
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "Error: %s\n", e.what());
+        return 1;
+    }
+    return 0;
+}

@@ -8,4 +8,4 @@ Each experiment keeps its own `README.md` with the hypothesis, method and result
 
 | Date | Experiment | Status | Outcome |
 |------|------------|--------|---------|
-| _add rows as experiments start_ | | | |
+| 2026-10-10 | [weight-transfer-baselines](2026-10-10-weight-transfer-baselines) | done | Benchmark set up; closest point and Epic inpainting scored on 6 synthetic garments | |

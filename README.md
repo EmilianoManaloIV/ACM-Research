@@ -10,7 +10,11 @@ The repository holds three kinds of work side by side: notes on related papers, 
 papers/        Related-work notes, one Markdown file per paper (start from papers/_template.md)
 experiments/   One dated folder per experiment with its hypothesis, method and results
 src/acm/       Shared C++ library: window and OpenGL context, shaders, framebuffer capture
+src/acm/skin/  Skinning research code: rigged glTF loading, linear blend skinning, weight transfer, metrics
 apps/sandbox/  Starter app: a lit, rotating cube to copy for new rendering experiments
+apps/weightbench/  Scores a weight-transfer method on a garment over a set of poses
+tools/         Python helpers: synthetic benchmark data, reference checks, result tables
+tests/data/    Small meshes used by the checks (Epic's sphere-to-plane example, MIT)
 shaders/       GLSL shaders, loaded from disk at runtime so they can be edited without rebuilding
 third_party/   Vendored code (the glad OpenGL loader)
 data/          Datasets and outputs, ignored by git
@@ -18,7 +22,7 @@ data/          Datasets and outputs, ignored by git
 
 ## Building
 
-Requirements: CMake 3.20+, a C++17 compiler, Git, and a GPU driver with OpenGL 3.3. CMake downloads GLFW 3.4 and GLM 1.0.1 the first time it configures.
+Requirements: CMake 3.20+, a C++17 compiler, Git, and a GPU driver with OpenGL 3.3. CMake downloads GLFW 3.4, GLM 1.0.1, libigl 2.5 (with Eigen) and tinygltf 2.9 the first time it configures.
 
 On Linux, install the X11 and OpenGL headers first. On Debian or Ubuntu:
 
@@ -42,6 +46,19 @@ cmake --build build
 ```
 
 The second form renders a fixed number of frames with a fixed timestep and saves the last one, which keeps figures reproducible. On Windows the binary is under `build/apps/sandbox/Release/`. On a machine without a display, wrap the command in `xvfb-run -a`.
+
+## Running the weight-transfer benchmark
+
+The Python tools need `pip install numpy scipy libigl trimesh pygltflib`.
+
+```sh
+python3 tools/make_synthetic.py                      # bodies, garments and poses into data/synthetic/
+tools/run_benchmark.sh data/results                  # every method on every garment, held-out poses
+python3 tools/summarize_results.py data/results/results.csv
+python3 tools/verify_inpaint.py build/apps/weightbench/weightbench   # C++ inpainting vs Epic's Python
+```
+
+`weightbench --help` style usage is at the top of `apps/weightbench/main.cpp`. New transfer methods go in `src/acm/skin/transfer.cpp` behind `runTransfer`, and each gets a dated folder in `experiments/` with its results table.
 
 ## Working in this repo
 
