@@ -21,14 +21,19 @@ for case in $CASES; do
   body=$(dirname "$case")
   garment=$(basename "$case")
   echo "== $case"
-  HEM=""
-  case "$garment" in skirt|dress) [ -f "$DATA/$body/hem.json" ] && HEM="--hem-rig $DATA/$body/hem.json" ;; esac
-  "$BENCH" --body "$DATA/$body/body.gltf" --garment "$DATA/$case.obj" --poses "$DATA/$body/poses.json" \
-    --pose-set test --method "$METHODS" --skinning "$SKINNING" $HEM --out "$OUT/$garment.csv" --save-weights "$OUT/weights" | grep -v '^source'
-  if [ -f "$OUT/results.csv" ]; then
-    tail -n +2 "$OUT/$garment.csv" >> "$OUT/results.csv"
-  else
-    cp "$OUT/$garment.csv" "$OUT/results.csv"
-  fi
+  # Skirts and dresses run twice when the body has a hem rig: plain, and with the rig (+hem rows).
+  HEMS=""
+  case "$garment" in skirt|dress) [ -f "$DATA/$body/hem.json" ] && HEMS="$DATA/$body/hem.json" ;; esac
+  for hem in none $HEMS; do
+    HEM=""; suffix=""
+    [ "$hem" != none ] && HEM="--hem-rig $hem" && suffix="_hem"
+    "$BENCH" --body "$DATA/$body/body.gltf" --garment "$DATA/$case.obj" --poses "$DATA/$body/poses.json" \
+      --pose-set test --method "$METHODS" --skinning "$SKINNING" $HEM --out "$OUT/$garment$suffix.csv" --save-weights "$OUT/weights" | grep -v '^source'
+    if [ -f "$OUT/results.csv" ]; then
+      tail -n +2 "$OUT/$garment$suffix.csv" >> "$OUT/results.csv"
+    else
+      cp "$OUT/$garment$suffix.csv" "$OUT/results.csv"
+    fi
+  done
 done
 echo "wrote $OUT/results.csv"

@@ -147,7 +147,7 @@ Eigen::MatrixXd assignHemWeights(const Mesh& garment, const Eigen::MatrixXd& W,
         // The rig owns the garment below the hip line only: a waistband
         // above the pivot would otherwise swing about it with the hem.
         const double hv = r.dot(rig.down) / rig.length;
-        const double share = rig.waist > 0.0 ? std::max(0.0, std::min(1.0, hv / rig.waist)) : (hv >= 0.0 ? 1.0 : 0.0);
+        const double share = rig.waist < 0.0 ? 1.0 : rig.waist > 0.0 ? std::max(0.0, std::min(1.0, hv / rig.waist)) : (hv >= 0.0 ? 1.0 : 0.0);
         double mass = 0.0;
         for (int j = 0; j < static_cast<int>(W.cols()); ++j) {
             if (moves[j]) {

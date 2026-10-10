@@ -23,7 +23,7 @@ struct HemRig {
     bool pivotOnHips = false;                        // "pivot": "hips" (v2) or "mid"
     bool lowerHangs = false;                         // "lower": "gravity" (v2) or "shank"
     bool sideDrive = false;                          // "drive": "side" (v3) or "azimuth"
-    double waist = 0.2;                              // "waist": weight moves onto the rig only below the hip line, ramping in over this share of the thigh
+    double waist = -1.0;                             // "waist": share of the thigh below the hip line over which weight ramps onto the rig; above it the weight goes to the parent. Negative (default): everything moves
     bool applyToMatched = false;                     // "apply": "all" moves matched vertices' leg weight too
     bool contact = false;                            // "contact": true, hem bones tilt at least enough to clear the thighs
     double contactClearance = 0.0;                   // "clearance", in model units
