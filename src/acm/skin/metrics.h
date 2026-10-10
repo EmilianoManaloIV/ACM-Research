@@ -13,6 +13,8 @@ struct PoseMetrics {
     double penetrationMaxDepth = 0.0;
     double stretchP95 = 0.0;            // 95th percentile of |posed edge / rest edge - 1|
     double stretchMax = 0.0;
+    double stretchMean = 0.0;           // mean of the same, so a tear spread over many edges and one over few compare
+    double tornFraction = 0.0;          // share of edges stretched or shrunk by more than 100%
     double offsetDrift = 0.0;           // mean change in garment-to-body distance from rest
 };
 

@@ -76,6 +76,16 @@ PoseMetrics evaluatePose(const Mesh& bodyRest, const Eigen::MatrixXd& bodyPosed,
     }
     m.stretchP95 = percentile(stretch, 0.95);
     m.stretchMax = stretch.empty() ? 0.0 : *std::max_element(stretch.begin(), stretch.end());
+    if (!stretch.empty()) {
+        double sum = 0.0;
+        int torn = 0;
+        for (const double s : stretch) {
+            sum += s;
+            torn += s > 1.0 ? 1 : 0;
+        }
+        m.stretchMean = sum / static_cast<double>(stretch.size());
+        m.tornFraction = static_cast<double>(torn) / static_cast<double>(stretch.size());
+    }
     return m;
 }
 

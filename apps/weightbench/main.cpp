@@ -171,7 +171,7 @@ int main(int argc, char** argv) {
                 return 1;
             }
             csv << "garment,method,pose,penetration_fraction,penetration_mean_depth,penetration_max_depth,"
-                   "stretch_p95,stretch_max,offset_drift,matched_fraction,seconds,dirichlet,min_weight,max_weight,"
+                   "stretch_p95,stretch_max,stretch_mean,torn_fraction,offset_drift,matched_fraction,seconds,dirichlet,min_weight,max_weight,"
                    "row_sum_error,max_influences,over_limit_fraction\n";
         }
         const std::string garmentName = baseName(options.garment);
@@ -184,7 +184,7 @@ int main(int argc, char** argv) {
                 // A method that cannot handle a garment is a result worth recording.
                 std::printf("%-10s FAILED: %s\n", method.c_str(), e.what());
                 if (csv) {
-                    csv << garmentName << ',' << method << ",failed,,,,,,,,,,,,,,\n";
+                    csv << garmentName << ',' << method << ",failed,,,,,,,,,,,,,,,,\n";
                 }
                 continue;
             }
@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
                         method.c_str(), 100.0 * matchedFraction, result.seconds, wm.dirichlet, wm.minWeight,
                         wm.maxWeight, wm.maxRowSumError, wm.maxInfluences);
             if (csv) {
-                csv << garmentName << ',' << method << ",weights,,,,,,," << matchedFraction << ',' << result.seconds
+                csv << garmentName << ',' << method << ",weights,,,,,,,,," << matchedFraction << ',' << result.seconds
                     << ',' << wm.dirichlet << ',' << wm.minWeight << ',' << wm.maxWeight << ',' << wm.maxRowSumError
                     << ',' << wm.maxInfluences << ',' << wm.overLimitFraction << '\n';
             }
@@ -234,7 +234,8 @@ int main(int argc, char** argv) {
                 if (csv) {
                     csv << garmentName << ',' << method << ',' << pose.name << ',' << pm.penetrationFraction << ','
                         << pm.penetrationMeanDepth << ',' << pm.penetrationMaxDepth << ',' << pm.stretchP95 << ','
-                        << pm.stretchMax << ',' << pm.offsetDrift << ",,,,,,,,\n";
+                        << pm.stretchMax << ',' << pm.stretchMean << ',' << pm.tornFraction << ',' << pm.offsetDrift
+                        << ",,,,,,,,\n";
                 }
             }
             if (!poses.empty()) {

@@ -1,16 +1,23 @@
 #!/usr/bin/env sh
 # Runs every method on every synthetic garment over the held-out test poses and
-# collects one CSV. Usage: tools/run_benchmark.sh [results_dir] [methods] [lbs|dqs]
+# collects one CSV. Usage: tools/run_benchmark.sh [results_dir] [methods] [lbs|dqs] [synthetic|makehuman]
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT=${1:-"$ROOT/data/results"}
 METHODS=${2:-all}
 SKINNING=${3:-lbs}
+DATASET=${4:-synthetic}
 BENCH="$ROOT/build/apps/weightbench/weightbench"
-DATA="$ROOT/data/synthetic"
+DATA="$ROOT/data/$DATASET"
+if [ "$DATASET" = makehuman ]; then
+  CASES="makehuman/skirt makehuman/tights makehuman/sleeve_tight makehuman/sleeve_loose makehuman/trousers makehuman/shirt"
+  DATA="$ROOT/data"
+else
+  CASES="arm/sleeve_tight arm/sleeve_loose arm/cuff legs/trousers legs/skirt legs/dress"
+fi
 mkdir -p "$OUT/weights"
 rm -f "$OUT/results.csv"
-for case in arm/sleeve_tight arm/sleeve_loose arm/cuff legs/trousers legs/skirt legs/dress; do
+for case in $CASES; do
   body=$(dirname "$case")
   garment=$(basename "$case")
   echo "== $case"
