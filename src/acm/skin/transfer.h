@@ -15,6 +15,9 @@ struct TransferParams {
     int smoothSteps = 10;
     double smoothAlpha = 0.2;
     double anchorSlack = 1.5;        // anchored: match a component's vertices within this factor of its nearest distance
+    bool relativeMatch = false;      // relative: also match within relativeSlack of the neighbourhood's nearest distance
+    double relativeSlack = 1.5;
+    double relativeRadiusFraction = 0.05;  // neighbourhood radius as a fraction of the target's bounding-box diagonal
 };
 
 struct TransferResult {
@@ -40,7 +43,12 @@ TransferResult transferBounded(const Mesh& source, const Mesh& target, const Tra
 // (buttons, belts) have something to inpaint from instead of a singular system.
 TransferResult transferAnchored(const Mesh& source, const Mesh& target, const TransferParams& params);
 
-// Dispatch by name ("closest", "inpaint", "bounded", "anchored"); throws on an unknown name.
+// M3: anchored, plus a region-relative distance threshold (see TransferParams),
+// so loose garments match the limb under them instead of the one bone that
+// happens to pass the global threshold.
+// (method name "relative"; implemented as transferAnchored with relativeMatch set)
+
+// Dispatch by name ("closest", "inpaint", "bounded", "anchored", "relative"); throws on an unknown name.
 TransferResult runTransfer(const std::string& method, const Mesh& source, const Mesh& target,
                            const TransferParams& params);
 std::vector<std::string> transferMethodNames();

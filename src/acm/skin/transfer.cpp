@@ -100,11 +100,43 @@ InpaintSetup prepareInpaint(const Mesh& source, const Mesh& target, const Transf
     // Section 3.1: closest point matching with distance and normal thresholds.
     s.cp = closestPoints(source, target);
     s.matched = Eigen::Array<bool, Eigen::Dynamic, 1>::Constant(n, false);
+
+    // M3: a region-relative threshold. Each vertex also matches if it is no
+    // further from the body than `relativeSlack` times the nearest distance
+    // found in its neighbourhood (vertices within `radius` of it along the
+    // mesh), so a sleeve that floats 5 cm off the arm everywhere still
+    // matches, while a fold that dips towards the body stands out.
+    Eigen::VectorXd localNearest = s.cp.sqrD;
+    if (params.relativeMatch) {
+        const double radius = params.relativeRadiusFraction * igl::bounding_box_diagonal(target.V);
+        std::vector<std::vector<int>> adjacency;
+        igl::adjacency_list(target.F, adjacency);
+        std::vector<int> seen(n, -1);
+        for (int seed = 0; seed < n; ++seed) {
+            std::vector<int> stack{seed};
+            seen[seed] = seed;
+            while (!stack.empty()) {
+                const int v = stack.back();
+                stack.pop_back();
+                localNearest(seed) = std::min(localNearest(seed), s.cp.sqrD(v));
+                for (int nb : adjacency[v]) {
+                    if (seen[nb] != seed && (target.V.row(seed) - target.V.row(nb)).norm() < radius) {
+                        seen[nb] = seed;
+                        stack.push_back(nb);
+                    }
+                }
+            }
+        }
+    }
     for (int i = 0; i < n; ++i) {
         const Eigen::Vector3d n1 = s.cp.N.row(i).normalized();
         const Eigen::Vector3d n2 = target.N.row(i).normalized();
         const double degrees = std::acos(std::clamp(n1.dot(n2), -1.0, 1.0)) * 180.0 / M_PI;
-        s.matched(i) = s.cp.sqrD(i) <= sqrDistance && degrees <= params.angleDegrees;
+        bool close = s.cp.sqrD(i) <= sqrDistance;
+        if (params.relativeMatch) {
+            close = close || s.cp.sqrD(i) <= localNearest(i) * params.relativeSlack * params.relativeSlack;
+        }
+        s.matched(i) = close && degrees <= params.angleDegrees;
     }
 
     Eigen::SparseMatrix<double> L;
@@ -321,11 +353,16 @@ TransferResult runTransfer(const std::string& method, const Mesh& source, const 
     if (method == "anchored") {
         return transferAnchored(source, target, params);
     }
+    if (method == "relative") {
+        TransferParams p = params;
+        p.relativeMatch = true;
+        return transferAnchored(source, target, p);
+    }
     throw std::runtime_error("unknown transfer method: " + method);
 }
 
 std::vector<std::string> transferMethodNames() {
-    return {"closest", "inpaint", "bounded", "anchored"};
+    return {"closest", "inpaint", "bounded", "anchored", "relative"};
 }
 
 Eigen::MatrixXd pruneInfluences(const Eigen::MatrixXd& W, int maxInfluences) {

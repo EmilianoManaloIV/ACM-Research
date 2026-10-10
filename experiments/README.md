@@ -11,3 +11,4 @@ Each experiment keeps its own `README.md` with the hypothesis, method and result
 | 2026-10-10 | [weight-transfer-baselines](2026-10-10-weight-transfer-baselines) | done | Benchmark set up; closest point and Epic inpainting scored on 6 synthetic garments |
 | 2026-10-10 | [bounded-inpainting](2026-10-10-bounded-inpainting) | done | Weights kept in [0, 1]; pose metrics unchanged; kept as default solve |
 | 2026-10-10 | [anchored-components](2026-10-10-anchored-components) | done | Detached pieces no longer make the solve singular; button still follows the wrong bone |
+| 2026-10-10 | [relative-matching](2026-10-10-relative-matching) | done, not adopted | Fixes the loose sleeve but tears the skirt and dress between the legs; needs M4 first |
