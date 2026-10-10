@@ -14,6 +14,7 @@ struct TransferParams {
     bool smooth = true;              // run the post-inpainting neighbour smoothing
     int smoothSteps = 10;
     double smoothAlpha = 0.2;
+    double anchorSlack = 1.5;        // anchored: match a component's vertices within this factor of its nearest distance
 };
 
 struct TransferResult {
@@ -34,7 +35,12 @@ TransferResult transferInpaint(const Mesh& source, const Mesh& target, const Tra
 // in bounded biharmonic weights), rows then normalised to sum to 1.
 TransferResult transferBounded(const Mesh& source, const Mesh& target, const TransferParams& params);
 
-// Dispatch by name ("closest", "inpaint", "bounded"); throws on an unknown name.
+// M5: bounded, plus every connected component with no match gets its
+// nearest vertices matched regardless of thresholds, so detached pieces
+// (buttons, belts) have something to inpaint from instead of a singular system.
+TransferResult transferAnchored(const Mesh& source, const Mesh& target, const TransferParams& params);
+
+// Dispatch by name ("closest", "inpaint", "bounded", "anchored"); throws on an unknown name.
 TransferResult runTransfer(const std::string& method, const Mesh& source, const Mesh& target,
                            const TransferParams& params);
 std::vector<std::string> transferMethodNames();

@@ -6,6 +6,8 @@
 
 #include <igl/active_set.h>
 #include <igl/adjacency_list.h>
+#include <igl/adjacency_matrix.h>
+#include <igl/connected_components.h>
 #include <igl/barycentric_coordinates.h>
 #include <igl/bounding_box_diagonal.h>
 #include <igl/cotmatrix.h>
@@ -16,6 +18,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace acm::skin {
@@ -202,16 +205,13 @@ TransferResult transferInpaint(const Mesh& source, const Mesh& target, const Tra
     return result;
 }
 
-TransferResult transferBounded(const Mesh& source, const Mesh& target, const TransferParams& params) {
-    requireSkinnedSource(source);
-    const auto start = std::chrono::steady_clock::now();
-    const InpaintSetup s = prepareInpaint(source, target, params);
+namespace {
+
+// Solves the inpainting energy per bone with 0 <= w <= 1 (active set), then
+// normalises rows to sum to 1 and runs Epic's smoothing.
+TransferResult solveBounded(const InpaintSetup& s, const Mesh& target, const TransferParams& params) {
     TransferResult result;
     result.matched = s.matched;
-
-    // Same energy as inpaint, but each bone is solved with 0 <= w <= 1 by an
-    // active-set method (as bounded biharmonic weights do), then rows are
-    // normalised to sum to 1.
     const int n = static_cast<int>(target.V.rows());
     const int bones = static_cast<int>(s.cp.W.cols());
     result.W.resize(n, bones);
@@ -245,6 +245,64 @@ TransferResult transferBounded(const Mesh& source, const Mesh& target, const Tra
     if (params.smooth) {
         smoothInpainted(target, s.matched, s.distance, params, result.W);
     }
+    return result;
+}
+
+// Rebuilds `known`/`knownValues` after `matched` has been edited.
+void refreshKnown(InpaintSetup& s) {
+    const int matchedCount = static_cast<int>(s.matched.count());
+    s.known.resize(matchedCount);
+    s.knownValues.resize(matchedCount, s.cp.W.cols());
+    for (int i = 0, k = 0; i < s.matched.size(); ++i) {
+        if (s.matched(i)) {
+            s.known(k) = i;
+            s.knownValues.row(k) = s.cp.W.row(i);
+            ++k;
+        }
+    }
+}
+
+}  // namespace
+
+TransferResult transferBounded(const Mesh& source, const Mesh& target, const TransferParams& params) {
+    requireSkinnedSource(source);
+    const auto start = std::chrono::steady_clock::now();
+    const InpaintSetup s = prepareInpaint(source, target, params);
+    TransferResult result = solveBounded(s, target, params);
+    result.seconds = elapsed(start);
+    return result;
+}
+
+TransferResult transferAnchored(const Mesh& source, const Mesh& target, const TransferParams& params) {
+    requireSkinnedSource(source);
+    const auto start = std::chrono::steady_clock::now();
+    InpaintSetup s = prepareInpaint(source, target, params);
+
+    // Every connected component needs at least one matched vertex or its
+    // rows of the system are singular. For a component with none, match the
+    // vertices nearest the body (within anchorSlack of the nearest), with the
+    // thresholds waived: a button has to follow *something*, and the closest
+    // bone is the least surprising choice.
+    Eigen::SparseMatrix<double> A;
+    igl::adjacency_matrix(target.F, A);
+    Eigen::VectorXi component;
+    Eigen::VectorXi componentSize;
+    const int components = igl::connected_components(A, component, componentSize);
+    std::vector<char> hasMatch(components, 0);
+    std::vector<double> nearest(components, std::numeric_limits<double>::infinity());
+    for (int i = 0; i < s.matched.size(); ++i) {
+        hasMatch[component(i)] |= s.matched(i);
+        nearest[component(i)] = std::min(nearest[component(i)], s.cp.sqrD(i));
+    }
+    for (int i = 0; i < s.matched.size(); ++i) {
+        const int c = component(i);
+        if (!hasMatch[c] && s.cp.sqrD(i) <= nearest[c] * params.anchorSlack * params.anchorSlack) {
+            s.matched(i) = true;
+        }
+    }
+    refreshKnown(s);
+
+    TransferResult result = solveBounded(s, target, params);
     result.seconds = elapsed(start);
     return result;
 }
@@ -260,11 +318,14 @@ TransferResult runTransfer(const std::string& method, const Mesh& source, const 
     if (method == "bounded") {
         return transferBounded(source, target, params);
     }
+    if (method == "anchored") {
+        return transferAnchored(source, target, params);
+    }
     throw std::runtime_error("unknown transfer method: " + method);
 }
 
 std::vector<std::string> transferMethodNames() {
-    return {"closest", "inpaint", "bounded"};
+    return {"closest", "inpaint", "bounded", "anchored"};
 }
 
 Eigen::MatrixXd pruneInfluences(const Eigen::MatrixXd& W, int maxInfluences) {
