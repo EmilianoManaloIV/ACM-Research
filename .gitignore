@@ -1,0 +1,16 @@
+# Build output
+build/
+out/
+cmake-build-*/
+
+# Editors and tools
+.vscode/
+.idea/
+.cache/
+compile_commands.json
+.DS_Store
+
+# Data and generated images (keep the README)
+data/*
+!data/README.md
+*.ppm
