@@ -2,6 +2,12 @@
 
 Research and architecture decisions, newest first. Each entry says what was decided, what else was considered, the evidence, and who approved it. A default method, metric, benchmark or research objective changes only through an entry here.
 
+## D-005 Broaden the research to bodies and clothes of any creature (2026-10-10)
+
+- **Decision:** the research covers automatic weighting of bodies as well as clothes, for bipeds, quadrupeds and unusual creatures. RQ-001 (clothing) keeps the leg-driven hem rig in scope, uses per-pose penetration, exposure and stretch p95 as primary metrics, binds the 5% keep rule, and requires a second real human body. RQ-002 is drafted for body weighting.
+- **Considered:** keeping RQ-001 to human garments only, as the first 20 experiments did.
+- **Approved by:** Emiliano (answers to the RQ-001 Gate A questions); the rewritten objectives await his confirmation.
+
 ## D-004 Commit each experiment's results table (2026-10-10)
 
 - **Decision:** every experiment commits its small `results.csv` next to its README. Meshes, posed outputs and other large files stay in `data/`, which git ignores.

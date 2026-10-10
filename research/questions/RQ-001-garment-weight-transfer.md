@@ -1,7 +1,8 @@
-# RQ-001: Automatic skin-weight transfer from a body to a garment
+# RQ-001: Automatic skin weights for clothing on any rigged character
 
 - **Opened:** 2026-10-10 (work began before the gated workflow; this file was reconstructed afterwards)
-- **Current gate:** A, awaiting the research director's decision
+- **Current gate:** A. Scope, metrics and completion criteria approved on 2026-10-10; the broadened objective below awaits the director's confirmation
+- **Companion question:** [RQ-002](RQ-002-automatic-body-weights.md), automatic weighting of the body itself
 - **Evidence:** `research/evidence/RQ-001.md` (not started; Gate B)
 - **Experiments:** 20 exploratory experiments on branch `claude/project-thread-27uwpy` (draft PR #2), listed in that branch's `experiments/README.md`
 
@@ -11,13 +12,15 @@ The first 20 experiments ran as an automatic loop from an experiment plan that w
 
 ## Objective
 
-Given a rigged body and an unrigged garment fitted to it, compute skinning weights for the garment automatically so that it follows the body through new poses with less interpenetration, tearing and exposed body than two baselines: closest-point transfer and Epic's weight inpainting (Abdrashitov et al. 2023, DOI 10.1145/3610543.3626180).
+Given a rigged character (a biped, a quadruped or an unusual creature) and an unrigged garment or accessory fitted to it, compute the garment's skinning weights, and any extra garment bones such as the hem rig, automatically, so that it follows the character through new poses with less interpenetration, tearing and exposed body than two baselines: closest-point transfer and Epic's weight inpainting (Abdrashitov et al. 2023, DOI 10.1145/3610543.3626180).
+
+Weighting the character's own mesh to its skeleton, with no existing weights to transfer from, is the companion question RQ-002. The director asked for both on 2026-10-10.
 
 ## Scope
 
-- **In scope:** per-vertex weight transfer methods and their parameters; scoring under linear blend skinning (LBS) and dual quaternion skinning (DQS); the two synthetic capsule bodies and the MakeHuman body (CC0) with their garments.
+- **In scope:** per-vertex weight transfer methods and their parameters; garment bones added automatically, such as the leg-driven hem rig (approved 2026-10-10); scoring under linear blend skinning (LBS) and dual quaternion skinning (DQS); human bodies (the two synthetic capsule bodies, MakeHuman, and a second real body) and non-human bodies (at least one quadruped and one unusual creature) with garments suited to each.
 - **Out of scope:** cloth simulation; per-pose correctives (displacements learned or authored on top of skinning), which the last experiment proposed as the next line. That is a different question and would be opened as its own RQ if the director wants it.
-- **Decision needed:** the hem rig adds bones to the garment, so it changes the rig rather than only transferring weights. It is in scope only if the director says so.
+- **Open:** which quadruped and creature bodies to use. Candidates need a licence that allows use and redistribution of results; RigNet's ModelsResource-RigNetv1 set (Xu et al. 2020, arXiv 2005.00559) has quadrupeds and fictional characters, but its licence terms have not been checked. Garments for non-human bodies (blankets, saddles, harnesses, armour) have to be made, so their design is part of Gate C.
 
 ## Definitions
 
@@ -40,11 +43,11 @@ Reconstructed from the experiments, for the director to confirm or change:
 
 Proposed, for the director to set at Gate A:
 
-1. A method answers the question if, on a fresh set of held-out poses never used for any tuning, it is no worse than the better baseline by more than 5% (relative) on any primary metric for any garment, and better on at least one primary metric for the garments that bridge the legs (skirt and dress), on both the synthetic and the MakeHuman bodies.
+1. A method answers the question if, on a fresh set of held-out poses never used for any tuning, it is no worse than the better baseline by more than 5% (relative) on any primary metric for any garment, and better on at least one primary metric for the garments that bridge the legs (skirt and dress), on the synthetic bodies, on two real human bodies, and on the quadruped and creature bodies. A result that holds for humans but not the other bodies is reported as such.
 2. The result is reproduced by a separate review session from the recorded commit.
 3. A negative answer is also a completion: if no method meets (1), the question closes with that finding and its limits.
 
-The 5% threshold is the keep rule the loop used. It was broken twice, in the consistency-check and makehuman-body experiments, with a note that the rule needed revisiting, so it should be confirmed or replaced here.
+The 5% threshold is the keep rule the loop used; the director confirmed it on 2026-10-10. It was broken twice by the loop (consistency-check, makehuman-body); under this file it is binding.
 
 ## What the exploratory experiments suggest
 
@@ -55,13 +58,9 @@ These are leads, not findings. Each is one deterministic run, tuned on its test 
 - On the real (MakeHuman) skirt, plain `kinblend` keeps exposure lowest (11% against 60% for the hem rig as first driven, 14% after side drivers), and nothing tried handles the sit pose.
 - Earlier "beats both baselines" calls rested on metrics or bodies that were later replaced (body v1; worst-pose-only scoring before exposure existed). They need re-checking under the final metrics.
 
-## Questions for Gate A
+## Open for Gate A
 
-1. Is the objective above the one you want to pursue?
-2. Is the hem rig in scope, or should RQ-001 be weight transfer only?
-3. Do you accept the proposed primary metrics and their per-pose reporting?
-4. Do you accept the completion criteria, including the 5% threshold?
-5. Do you want a second real body before any conclusion about real garments?
+1. Confirm the broadened objective above: clothing on bipeds, quadrupeds and creatures, with body weighting split out as RQ-002.
 
 ## Gate log
 
@@ -69,4 +68,4 @@ Only the research director's decisions go here.
 
 | Date | Gate | Decision | By | Note |
 |------|------|----------|----|------|
-| | A | | | |
+| 2026-10-10 | A | Hem rig in scope; per-pose primary metrics accepted; completion criteria and 5% threshold accepted; a second real body required; objective to cover quadrupeds and unusual creatures, bodies as well as clothes | Emiliano | Objective rewritten from this answer; awaiting confirmation of the wording |
