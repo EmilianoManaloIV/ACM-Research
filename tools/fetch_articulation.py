@@ -2,7 +2,7 @@
 Articulation-XL2.0, filtered and converted for bodybench.
 
   python3 tools/fetch_articulation.py select DATA LIST.csv
-  python3 tools/fetch_articulation.py convert DATA LIST.csv OUT
+  python3 tools/fetch_articulation.py convert DATA LIST.csv OUT [--weld]
 
 DATA holds the downloads (see data/README.md):
   articulation-xl2/meta.csv                    the dataset's metadata
@@ -29,6 +29,12 @@ convert writes OUT/<uuid>/body.glb (mesh, skeleton, and the four largest
 weights per vertex, which is all glTF holds) and OUT/<uuid>/artist.csv (every
 artist weight, rows normalised, as the dataset README advises), for
 bodybench --artist-weights.
+
+--weld merges vertices at exactly the same position (the dataset splits
+meshes at UV seams, and some are unindexed triangle soups) and drops faces
+that collapse. Merged vertices get the mean of their artist weights; the
+largest disagreement is printed. This is a mesh clean-up, so under the
+protocol it must be applied to every method and logged as a deviation.
 
 The dataset ships as a pickled NumPy array, so loading it runs pickle. Only
 load files downloaded from the dataset's own Hugging Face repository.
@@ -203,7 +209,28 @@ def write_gltf(d, W, path):
     gltf.save_binary(path)
 
 
-def convert(data, listing, out):
+def weld(d, W):
+    V = d["vertices"]
+    _, first, inverse = np.unique(V, axis=0, return_index=True, return_inverse=True)
+    inverse = inverse.reshape(-1)
+    order = np.argsort(first)  # keep the original order of first occurrences
+    rank = np.empty_like(order)
+    rank[order] = np.arange(len(order))
+    new = rank[inverse]
+    F = new[d["faces"]]
+    F = F[(F[:, 0] != F[:, 1]) & (F[:, 1] != F[:, 2]) & (F[:, 0] != F[:, 2])]
+    Wn = np.zeros((len(order), W.shape[1]))
+    np.add.at(Wn, new, W)
+    count = np.bincount(new)
+    Wn /= count[:, None]
+    spread = float(np.abs(W - Wn[new]).sum(1).max())
+    d = dict(d)
+    d["vertices"] = V[first[order]]
+    d["faces"] = F
+    return d, Wn, spread
+
+
+def convert(data, listing, out, welded=False):
     split = load_split(data)
     with open(listing) as f:
         rows = list(csv.DictReader(f))
@@ -212,6 +239,11 @@ def convert(data, listing, out):
         folder = os.path.join(out, r["uuid"])
         os.makedirs(folder, exist_ok=True)
         W = artist_weights(d)
+        if welded:
+            before = (len(d["vertices"]), len(d["faces"]))
+            d, W, spread = weld(d, W)
+            print(f"  welded {before[0]} -> {len(d['vertices'])} vertices, {before[1]} -> {len(d['faces'])} faces, "
+                  f"largest L1 between merged vertices' weights {spread:.3g}")
         write_gltf(d, W, os.path.join(folder, "body.glb"))
         np.savetxt(os.path.join(folder, "artist.csv"), W, delimiter=",", fmt="%.9g")
         print(f"{r['group']:9s} {r['uuid']}  {len(d['vertices'])} vertices, {W.shape[1]} joints, "
@@ -221,8 +253,8 @@ def convert(data, listing, out):
 def main(argv):
     if len(argv) == 3 and argv[0] == "select":
         select(argv[1], argv[2])
-    elif len(argv) == 4 and argv[0] == "convert":
-        convert(argv[1], argv[2], argv[3])
+    elif len(argv) in (4, 5) and argv[0] == "convert" and argv[4:] in ([], ["--weld"]):
+        convert(argv[1], argv[2], argv[3], welded=argv[4:] == ["--weld"])
     else:
         sys.exit(__doc__)
 

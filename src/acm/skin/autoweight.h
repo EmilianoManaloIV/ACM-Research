@@ -46,8 +46,10 @@ struct AutoWeightResult {
 // as interior points, each bone gets weight 1 on its samples and 0 on the
 // others, and the weights are solved with the active-set QP (no partition of
 // unity constraint, rows normalised afterwards, as in libigl's tutorial).
+// maxIterations caps the active-set loop; the tutorial's 8 can stop before
+// convergence, leaving small negative weights.
 AutoWeightResult boundedBiharmonicWeights(const Mesh& body, const std::vector<BoneSegment>& bones, int joints,
-                                          int samplesPerBone = 10);
+                                          int samplesPerBone = 10, int maxIterations = 8);
 
 // Rows with a positive sum are normalised to sum to one, as Blender and
 // libigl do before deforming; negative values above -epsilon are set to zero.

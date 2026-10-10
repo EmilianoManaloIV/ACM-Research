@@ -1,7 +1,10 @@
 #!/usr/bin/env sh
 # Runs experiment 2026-10-10-auto-weight-baselines (RQ-002): every method on
 # every character, once, as the protocol allows.
-# Usage: tools/run_auto_weight.sh <out_dir>
+# Usage: tools/run_auto_weight.sh <out_dir> [characters_dir] [extra bodybench flags for bbw]
+# characters_dir defaults to data/articulation-xl2/characters; pass
+# data/articulation-xl2/characters_welded for the welded meshes. Extra flags
+# (say --bbw-iterations 100 --score-invalid) apply to the BBW run only.
 # Needs build/apps/bodybench, Blender 4.0.2 on PATH, data/makehuman/body.gltf
 # (tools/make_makehuman.py) and data/articulation-xl2/characters/
 # (tools/fetch_articulation.py convert). Writes one folder per character with
@@ -9,6 +12,9 @@
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT=$1
+CHARS=${2:-$ROOT/data/articulation-xl2/characters}
+[ $# -ge 2 ] && shift 2 || shift 1
+BBW_FLAGS="$*"
 [ -n "$OUT" ] || { echo "usage: $0 <out_dir>" >&2; exit 2; }
 BENCH="$ROOT/build/apps/bodybench/bodybench"
 LIST="$ROOT/experiments/2026-10-10-auto-weight-baselines/characters.csv"
@@ -32,7 +38,7 @@ run_one() {  # name group body [artist.csv]
     --out "$dir/results.csv" > "$dir/bodybench.log" 2>&1 || echo "$name: bodybench failed, see $dir/bodybench.log"
   # BBW in its own process: TetGen can crash on self-intersecting input, and
   # that is a BBW failure, not a reason to lose the other methods' rows.
-  if "$BENCH" "$@" $common --method bbw --out "$dir/bbw.csv" > "$dir/bbw.log" 2>&1; then
+  if "$BENCH" "$@" $common $BBW_FLAGS --method bbw --out "$dir/bbw.csv" > "$dir/bbw.log" 2>&1; then
     tail -n +2 "$dir/bbw.csv" >> "$dir/results.csv"
   else
     code=$?
@@ -45,7 +51,7 @@ run_one() {  # name group body [artist.csv]
 
 run_one makehuman humanoid "$ROOT/data/makehuman/body.gltf"
 tail -n +2 "$LIST" | while IFS=, read -r group uuid rest; do
-  c="$ROOT/data/articulation-xl2/characters/$uuid"
+  c="$CHARS/$uuid"
   run_one "$uuid" "$group" "$c/body.glb" "$c/artist.csv"
 done
 

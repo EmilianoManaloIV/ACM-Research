@@ -5,7 +5,7 @@
 //   bodybench --body body.gltf --poses poses.json [--pose-set test,named]
 //             [--method floor,bbw,artist,csv:bone_heat=weights.csv] [--character name]
 //             [--out results.csv] [--save-weights dir] [--export-bones bones.json] [--export-mesh body.obj]
-//             [--skinning lbs|dqs] [--bbw-samples 10] [--artist-weights artist.csv]
+//             [--skinning lbs|dqs] [--bbw-samples 10] [--bbw-iterations 8] [--artist-weights artist.csv]
 //
 //   floor   B0, inverse squared distance to each bone
 //   bbw     B2, bounded biharmonic weights (libigl, TetGen)
@@ -24,6 +24,7 @@
 // row per (method, pose) with stretch, torn edges, self-intersection above
 // rest, and distance from the artist-weighted pose. A method whose weights
 // are invalid gets no pose rows: the protocol records it as a failure.
+// --score-invalid (exploratory runs only) scores them anyway, marked valid 0.
 
 #include "acm/skin/autoweight.h"
 #include "acm/skin/gltf.h"
@@ -56,6 +57,8 @@ struct Options {
     std::string exportMesh;
     std::string artistWeights;
     int bbwSamples = 10;
+    int bbwIterations = 8;
+    bool scoreInvalid = false;
     acm::skin::SkinningMode skinning = acm::skin::SkinningMode::LinearBlend;
 };
 
@@ -64,7 +67,7 @@ struct Options {
                  "usage: %s --body body.gltf --poses poses.json [--pose-set test,named]\n"
                  "          [--method floor,bbw,artist,csv:name=path] [--character name] [--out results.csv]\n"
                  "          [--save-weights dir] [--export-bones bones.json] [--export-mesh body.obj] [--skinning lbs|dqs] [--bbw-samples 10]\n"
-                 "          [--artist-weights artist.csv]\n",
+                 "          [--bbw-iterations 8] [--artist-weights artist.csv] [--score-invalid]\n",
                  argv0);
     std::exit(2);
 }
@@ -101,7 +104,9 @@ Options parseArgs(int argc, char** argv) {
         else if (a == "--export-bones") o.exportBones = next();
         else if (a == "--export-mesh") o.exportMesh = next();
         else if (a == "--artist-weights") o.artistWeights = next();
+        else if (a == "--score-invalid") o.scoreInvalid = true;
         else if (a == "--bbw-samples") o.bbwSamples = std::atoi(next().c_str());
+        else if (a == "--bbw-iterations") o.bbwIterations = std::atoi(next().c_str());
         else if (a == "--skinning") {
             if (!acm::skin::parseSkinningMode(next(), o.skinning)) usage(argv[0]);
         } else usage(argv[0]);
@@ -212,7 +217,7 @@ int main(int argc, char** argv) {
             if (spec == "floor") {
                 result.W = inverseDistanceWeights(rig.body.V, bones, joints);
             } else if (spec == "bbw") {
-                result = boundedBiharmonicWeights(rig.body, bones, joints, options.bbwSamples);
+                result = boundedBiharmonicWeights(rig.body, bones, joints, options.bbwSamples, options.bbwIterations);
             } else if (spec == "artist") {
                 if (!hasArtist) {
                     std::fprintf(stderr, "skipping artist: %s has no weights\n", options.body.c_str());
@@ -254,7 +259,9 @@ int main(int argc, char** argv) {
             if (!options.saveWeights.empty() && result.W.size() > 0) {
                 saveWeightsCSV(options.saveWeights + "/" + options.character + "." + method + ".csv", result.W);
             }
-            if (!valid) {
+            // Exploratory only: --score-invalid poses weights that failed the
+            // validity check (rows stay marked valid 0), as long as they exist.
+            if (!valid && !(options.scoreInvalid && unweighted == 0 && result.W.allFinite() && result.W.size() > 0)) {
                 continue;
             }
             for (size_t k = 0; k < poses.size(); ++k) {
@@ -268,7 +275,7 @@ int main(int argc, char** argv) {
                     dist = (posed - artistPosed[k]).rowwise().norm().mean() / scale;
                 }
                 row(method, poses[k].name,
-                    {"1", std::to_string(unweighted), fmt(m.stretchP95), fmt(m.stretchMean), fmt(m.stretchMax),
+                    {valid ? "1" : "0", std::to_string(unweighted), fmt(m.stretchP95), fmt(m.stretchMean), fmt(m.stretchMax),
                      fmt(m.tornFraction), fmt(self), "", "", "", fmt(dist), "", ""});
             }
         }

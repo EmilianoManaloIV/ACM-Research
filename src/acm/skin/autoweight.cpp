@@ -89,7 +89,7 @@ Eigen::MatrixXd inverseDistanceWeights(const Eigen::MatrixXd& V, const std::vect
 }
 
 AutoWeightResult boundedBiharmonicWeights(const Mesh& body, const std::vector<BoneSegment>& bones, int joints,
-                                          int samplesPerBone) {
+                                          int samplesPerBone, int maxIterations) {
     AutoWeightResult result;
     const int n = static_cast<int>(body.V.rows());
 
@@ -167,7 +167,7 @@ AutoWeightResult boundedBiharmonicWeights(const Mesh& body, const std::vector<Bo
     }
 
     igl::BBWData data;
-    data.active_set_params.max_iter = 8;  // libigl tutorial 403
+    data.active_set_params.max_iter = maxIterations;  // 8 in libigl tutorial 403
     data.verbosity = 0;
     Eigen::MatrixXd Wh;
     if (!igl::bbw(TV, TT, b, bc, data, Wh)) {
