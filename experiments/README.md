@@ -13,3 +13,4 @@ Each experiment keeps its own `README.md` with the hypothesis, method and result
 | 2026-10-10 | [anchored-components](2026-10-10-anchored-components) | done | Detached pieces no longer make the solve singular; button still follows the wrong bone |
 | 2026-10-10 | [relative-matching](2026-10-10-relative-matching) | done, not adopted | Fixes the loose sleeve but tears the skirt and dress between the legs; needs M4 first |
 | 2026-10-10 | [consistency-check](2026-10-10-consistency-check) | done | Drops matches where the closest point jumps between legs; first method to beat both baselines on the skirt; kept as default |
+| 2026-10-10 | [offset-blend](2026-10-10-offset-blend) | done, not adopted | Wider blend on loose garments increases LBS collapse at the elbow; the limit is the skinning model, not the weights |

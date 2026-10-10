@@ -200,6 +200,44 @@ InpaintSetup prepareInpaint(const Mesh& source, const Mesh& target, const Transf
     }
     s.Q = -L + L * Minv * L;
 
+    // M7: a garment that sits d away from the body should blend between
+    // bones over a wider region than the skin does, roughly in proportion
+    // to d (a sleeve 7 cm out bends on a 7 cm radius, the skin on 3 cm).
+    // Each matched vertex takes the average of the matched weights within
+    // offsetBlend * d of it, so the copied blend widens with the offset.
+    if (params.offsetBlend > 0.0) {
+        std::vector<std::vector<int>> adjacency;
+        igl::adjacency_list(target.F, adjacency);
+        Eigen::MatrixXd blended = s.cp.W;
+        std::vector<int> seen(n, -1);
+        for (int seed = 0; seed < n; ++seed) {
+            if (!s.matched(seed)) {
+                continue;
+            }
+            const double radius = params.offsetBlend * std::sqrt(s.cp.sqrD(seed));
+            Eigen::RowVectorXd sum = Eigen::RowVectorXd::Zero(s.cp.W.cols());
+            int count = 0;
+            std::vector<int> stack{seed};
+            seen[seed] = seed;
+            while (!stack.empty()) {
+                const int v = stack.back();
+                stack.pop_back();
+                if (s.matched(v)) {
+                    sum += s.cp.W.row(v);
+                    ++count;
+                }
+                for (int nb : adjacency[v]) {
+                    if (seen[nb] != seed && (target.V.row(seed) - target.V.row(nb)).norm() < radius) {
+                        seen[nb] = seed;
+                        stack.push_back(nb);
+                    }
+                }
+            }
+            blended.row(seed) = sum / count;
+        }
+        s.cp.W = blended;
+    }
+
     const int matchedCount = static_cast<int>(s.matched.count());
     if (matchedCount == 0) {
         throw std::runtime_error("transfer: no target vertex matched the source, nothing to inpaint from");
@@ -409,11 +447,20 @@ TransferResult runTransfer(const std::string& method, const Mesh& source, const 
         p.consistencyCheck = true;
         return transferAnchored(source, target, p);
     }
+    if (method == "offsetblend") {
+        TransferParams p = params;
+        p.relativeMatch = true;
+        p.consistencyCheck = true;
+        if (p.offsetBlend <= 0.0) {
+            p.offsetBlend = 2.0;
+        }
+        return transferAnchored(source, target, p);
+    }
     throw std::runtime_error("unknown transfer method: " + method);
 }
 
 std::vector<std::string> transferMethodNames() {
-    return {"closest", "inpaint", "bounded", "anchored", "relative", "consistent"};
+    return {"closest", "inpaint", "bounded", "anchored", "relative", "consistent", "offsetblend"};
 }
 
 Eigen::MatrixXd pruneInfluences(const Eigen::MatrixXd& W, int maxInfluences) {

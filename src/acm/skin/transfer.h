@@ -21,6 +21,7 @@ struct TransferParams {
     bool consistencyCheck = false;   // consistent: drop matches where the closest-point map jumps
     double consistencyJump = 2.0;    // a jump is a closest-point separation over this many edge lengths
     double consistencyMargin = 2.0;  // matches within this many jump distances of a jump are dropped too
+    double offsetBlend = 0.0;        // offsetblend: average matched weights within this many offset distances (0 = off)
 };
 
 struct TransferResult {
@@ -55,8 +56,12 @@ TransferResult transferAnchored(const Mesh& source, const Mesh& target, const Tr
 // far-apart body points (the wrong-leg case), with a margin of half the jump,
 // so the gap is inpainted as a blend. (method name "consistent")
 
+// M7: consistent, plus each matched vertex's copied weights are averaged over
+// a radius proportional to its distance from the body, so a loose garment
+// blends across a joint over a wider region than the skin. (method name "offsetblend")
+
 // Dispatch by name ("closest", "inpaint", "bounded", "anchored", "relative",
-// "consistent"); throws on an unknown name.
+// "consistent", "offsetblend"); throws on an unknown name.
 TransferResult runTransfer(const std::string& method, const Mesh& source, const Mesh& target,
                            const TransferParams& params);
 std::vector<std::string> transferMethodNames();
