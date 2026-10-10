@@ -5,11 +5,13 @@
 //   bodybench --body body.gltf --poses poses.json [--pose-set test,named]
 //             [--method floor,bbw,artist,csv:bone_heat=weights.csv] [--character name]
 //             [--out results.csv] [--save-weights dir] [--export-bones bones.json] [--export-mesh body.obj]
-//             [--skinning lbs|dqs] [--bbw-samples 10]
+//             [--skinning lbs|dqs] [--bbw-samples 10] [--artist-weights artist.csv]
 //
 //   floor   B0, inverse squared distance to each bone
 //   bbw     B2, bounded biharmonic weights (libigl, TetGen)
-//   artist  the weights shipped in the glTF, scored as a reference row
+//   artist  the weights shipped in the glTF, scored as a reference row;
+//           --artist-weights replaces them with a CSV, for references with
+//           more than the four influences per vertex glTF holds
 //   csv:NAME=PATH   weights computed elsewhere (B1, Blender bone heat), one
 //                   row per vertex and one column per joint, in joint order
 //
@@ -52,6 +54,7 @@ struct Options {
     std::string saveWeights;
     std::string exportBones;
     std::string exportMesh;
+    std::string artistWeights;
     int bbwSamples = 10;
     acm::skin::SkinningMode skinning = acm::skin::SkinningMode::LinearBlend;
 };
@@ -60,7 +63,8 @@ struct Options {
     std::fprintf(stderr,
                  "usage: %s --body body.gltf --poses poses.json [--pose-set test,named]\n"
                  "          [--method floor,bbw,artist,csv:name=path] [--character name] [--out results.csv]\n"
-                 "          [--save-weights dir] [--export-bones bones.json] [--export-mesh body.obj] [--skinning lbs|dqs] [--bbw-samples 10]\n",
+                 "          [--save-weights dir] [--export-bones bones.json] [--export-mesh body.obj] [--skinning lbs|dqs] [--bbw-samples 10]\n"
+                 "          [--artist-weights artist.csv]\n",
                  argv0);
     std::exit(2);
 }
@@ -96,6 +100,7 @@ Options parseArgs(int argc, char** argv) {
         else if (a == "--save-weights") o.saveWeights = next();
         else if (a == "--export-bones") o.exportBones = next();
         else if (a == "--export-mesh") o.exportMesh = next();
+        else if (a == "--artist-weights") o.artistWeights = next();
         else if (a == "--bbw-samples") o.bbwSamples = std::atoi(next().c_str());
         else if (a == "--skinning") {
             if (!acm::skin::parseSkinningMode(next(), o.skinning)) usage(argv[0]);
@@ -129,7 +134,16 @@ int main(int argc, char** argv) {
     using namespace acm::skin;
     const Options options = parseArgs(argc, argv);
     try {
-        const Rig rig = loadRig(options.body);
+        Rig rig = loadRig(options.body);
+        if (!options.artistWeights.empty()) {
+            Eigen::MatrixXd W;
+            if (!loadWeightsCSV(options.artistWeights, W) || W.rows() != rig.body.V.rows() ||
+                W.cols() != rig.skeleton.size()) {
+                throw std::runtime_error(options.artistWeights + " does not match the body's vertices and joints");
+            }
+            normaliseRows(W);
+            rig.body.W = W;
+        }
         const int joints = rig.skeleton.size();
         const std::vector<BoneSegment> bones = boneSegments(rig.skeleton);
         if (!options.exportBones.empty()) {

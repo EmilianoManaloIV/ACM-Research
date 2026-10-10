@@ -5,9 +5,10 @@
 bones.json  written by bodybench --export-bones
 poses.json  gets two lists bodybench reads with --pose-set test,named:
 
-test   20 random poses, seeds 0 to 19. Every joint except the roots turns by
-       an angle drawn uniformly from -45 to 45 degrees about an axis drawn
-       uniformly from the sphere.
+test   20 random poses, seeds 0 to 19. Every joint in the limb chains (the
+       same 5 chains as the named poses) turns by an angle drawn uniformly
+       from -45 to 45 degrees about an axis drawn uniformly from the sphere;
+       every other joint stays at rest.
 named  one pose per limb chain, for the 5 longest chains: every joint in the
        chain bends 45 degrees about an axis perpendicular to its bone, so the
        chain curls. A chain starts at a child of a branching joint (or of a
@@ -86,19 +87,21 @@ def main(argv):
     with open(bones_path) as f:
         bones = json.load(f)["bones"]
 
+    limbs = chains(bones)
+    limb_joints = {j for chain in limbs for j in chain}
     test = []
     for seed in range(RANDOM_POSES):
         rng = random.Random(seed)
         joints = {}
         for b in bones:
-            if b["parent"] is None:
+            if b["name"] not in limb_joints:
                 continue
             axis = random_axis(rng)
             joints[b["name"]] = {"axis": axis, "deg": rng.uniform(-MAX_DEG, MAX_DEG)}
         test.append({"name": f"random{seed:02d}", "seed": seed, "joints": joints})
 
     named = []
-    for chain in chains(bones):
+    for chain in limbs:
         local = {b["name"]: b["local_tail"] for b in bones}
         named.append(
             {
