@@ -5,7 +5,7 @@ Written before any run, for Gate C. Frozen once the director approves it; later 
 - **Question:** [`research/questions/RQ-002-automatic-body-weights.md`](../../research/questions/RQ-002-automatic-body-weights.md)
 - **Evidence:** [`research/evidence/RQ-002.md`](../../research/evidence/RQ-002.md)
 - **Kind:** confirmatory for H1 and H2 below; no method of ours is tested yet
-- **Gate C approved:** not yet
+- **Gate C approved:** 2026-10-10, Emiliano
 
 ## Why this experiment first
 

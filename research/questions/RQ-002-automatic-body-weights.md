@@ -1,9 +1,9 @@
 # RQ-002: Automatic skin weights for bipeds, quadrupeds and creatures
 
 - **Opened:** 2026-10-10, drafted from the director's Gate A answer on RQ-001
-- **Current gate:** C, first protocol ready for the director. Gates A and B passed 2026-10-10
+- **Current gate:** D, implementing the first protocol. Gates A to C passed 2026-10-10
 - **Evidence:** [`research/evidence/RQ-002.md`](../evidence/RQ-002.md), ready for Gate B
-- **Experiments:** [auto-weight-baselines](../../experiments/2026-10-10-auto-weight-baselines/protocol.md) (protocol, awaiting Gate C)
+- **Experiments:** [auto-weight-baselines](../../experiments/2026-10-10-auto-weight-baselines/protocol.md) (protocol approved; implementation in progress)
 - **Companion question:** [RQ-001](RQ-001-garment-weight-transfer.md), weights for clothing on these characters
 
 ## Objective
@@ -49,3 +49,4 @@ Only the research director's decisions go here.
 |------|------|----------|----|------|
 | 2026-10-10 | A | Passed: objective as written, skeleton placement out of scope; goes before RQ-001; artist-weight agreement reported as a separate reference measure | Emiliano | |
 | 2026-10-10 | B | Passed: evidence accepted; proceed to the first protocol. Asked to build on released models from papers and companies as well | Emiliano | Learned models planned as the second experiment |
+| 2026-10-10 | C | Passed: auto-weight-baselines protocol approved; huggingface.co to be allowed for Articulation-XL2.0; a GPU machine is available later for learned models | Emiliano | |
