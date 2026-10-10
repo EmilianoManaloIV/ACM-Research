@@ -143,17 +143,24 @@ Eigen::MatrixXd assignHemWeights(const Mesh& garment, const Eigen::MatrixXd& W,
         if (matched(i) && !rig.applyToMatched) {
             continue;
         }
+        const Eigen::Vector3d r = garment.V.row(i).transpose() - rig.pivot;
+        // The rig owns the garment below the hip line only: a waistband
+        // above the pivot would otherwise swing about it with the hem.
+        const double hv = r.dot(rig.down) / rig.length;
+        const double share = rig.waist > 0.0 ? std::max(0.0, std::min(1.0, hv / rig.waist)) : (hv >= 0.0 ? 1.0 : 0.0);
+        if (share <= 0.0) {
+            continue;
+        }
         double mass = 0.0;
         for (int j = 0; j < static_cast<int>(W.cols()); ++j) {
             if (moves[j]) {
-                mass += out(i, j);
-                out(i, j) = 0.0;
+                mass += share * out(i, j);
+                out(i, j) *= 1.0 - share;
             }
         }
         if (mass <= 0.0) {
             continue;
         }
-        const Eigen::Vector3d r = garment.V.row(i).transpose() - rig.pivot;
         double azimuth = std::atan2(r.dot(rig.e2), r.dot(rig.e1));
         if (azimuth < 0.0) {
             azimuth += 2.0 * M_PI;
