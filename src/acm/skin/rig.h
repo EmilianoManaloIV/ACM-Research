@@ -35,6 +35,8 @@ struct DrivenJoint {
     double follow = 1.0;            // share of a leg's swing the bone takes (cloth slides over the thigh)
     double falloff = 1.0;           // exponent on the azimuth cosine: higher, narrower push
     bool pivotOnHips = false;       // v2: pivot slides along the hip line toward the bone's side
+    bool sideDrive = false;         // v3: a leg pushes the bones on its side of the hip line in its own swing direction
+    Eigen::Vector3d across;         // unit hip line (first leg to last), for sideDrive
     bool lowerHangs = false;        // v2: tier 1 hangs down in world unless a shank pushes it
     std::vector<double> legRadius;  // v2 contact: thigh radius per leg; empty = no contact test
     double contactClearance = 0.0;  // extra distance the hem keeps from the thigh axis

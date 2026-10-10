@@ -109,6 +109,39 @@ double hemTilt(const DrivenJoint& d, const std::vector<Eigen::Vector3d>& rest,
     return d.follow * tilt;
 }
 
+// v3 side drive: the horizontal tilt vector of a tier-0 bone. Each leg
+// pushes the bones on its own side of the hip line (fully on its side,
+// fading to nothing on the far side; front and back bones belong to both)
+// in the direction of its own horizontal swing, and only when that swing
+// is not away from the bone. Legs that push are averaged, so in a stride
+// the front bone follows the forward leg, in a sit both legs agree, and in
+// a spread the two pushes on the front bone cancel.
+Eigen::Vector3d hemTiltVector(const DrivenJoint& d, const std::vector<Eigen::Vector3d>& rest,
+                              const std::vector<Eigen::Matrix4d>& M) {
+    Eigen::Vector3d total = Eigen::Vector3d::Zero();
+    double weight = 0.0;
+    const double x = d.direction.dot(d.across);
+    for (const auto& leg : d.legs) {
+        const Eigen::Vector3d seg0 = (rest[leg[1]] - rest[leg[0]]).normalized();
+        const Eigen::Vector3d seg = M[leg[0]].block<3, 3>(0, 0) * seg0;
+        const double swing = std::acos(std::max(-1.0, std::min(1.0, seg.dot(seg0))));
+        Eigen::Vector3d horizontal = seg - seg.dot(d.down) * d.down;
+        const double h = horizontal.norm();
+        if (h < 1e-9 || swing < 1e-6) {
+            continue;
+        }
+        horizontal /= h;
+        const double sideOfLeg = (rest[leg[0]] - d.pivot).dot(d.across) >= 0.0 ? 1.0 : -1.0;
+        const double g = std::max(0.0, std::min(1.0, 1.0 + x * sideOfLeg));
+        if (g <= 0.0 || horizontal.dot(d.direction) < -1e-6) {
+            continue;
+        }
+        total += g * swing * horizontal;
+        weight += g;
+    }
+    return weight > 0.0 ? Eigen::Vector3d(d.follow * total / weight) : total;
+}
+
 }  // namespace
 
 namespace {
@@ -179,9 +212,16 @@ void driveHemJoints(const Skeleton& skeleton, std::vector<Eigen::Matrix4d>& M) {
     for (size_t k = 0; k < skeleton.driven.size(); ++k) {
         const DrivenJoint& d = skeleton.driven[k];
         if (d.tier == 0) {
-            double tilt = hemTilt(d, rest, M, 0);
-            tilt = hemContactTilt(d, rest, M, tilt, hemPivot(d, rest));
-            const Eigen::Vector3d dir = std::cos(tilt) * d.down + std::sin(tilt) * d.direction;
+            Eigen::Vector3d dir;
+            if (d.sideDrive) {
+                const Eigen::Vector3d T = hemTiltVector(d, rest, M);
+                const double tilt = T.norm();
+                dir = tilt > 1e-9 ? Eigen::Vector3d(std::cos(tilt) * d.down + std::sin(tilt) * T / tilt) : d.down;
+            } else {
+                double tilt = hemTilt(d, rest, M, 0);
+                tilt = hemContactTilt(d, rest, M, tilt, hemPivot(d, rest));
+                dir = std::cos(tilt) * d.down + std::sin(tilt) * d.direction;
+            }
             M[d.joint] = rotateAbout(hemPivot(d, rest), Eigen::Quaterniond::FromTwoVectors(d.down, dir));
         } else {
             const DrivenJoint& parent = skeleton.driven[d.parentDriven];

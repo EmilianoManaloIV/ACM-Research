@@ -72,6 +72,8 @@ void addHemJoints(Skeleton& skeleton, HemRig& rig) {
                 d.contactClearance = rig.contactClearance;
             }
             d.lowerHangs = rig.lowerHangs;
+            d.sideDrive = rig.sideDrive;
+            d.across = rig.e1;
             d.legs = rig.legs;
             d.parentDriven = tier == 0 ? -1 : k;
             skeleton.names.push_back("hem_t" + std::to_string(tier) + "_" + std::to_string(k));

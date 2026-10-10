@@ -301,7 +301,7 @@ int main(int argc, char** argv) {
                     csv << garmentName << ',' << method << ',' << pose.name << ',' << pm.penetrationFraction << ','
                         << pm.penetrationMeanDepth << ',' << pm.penetrationMaxDepth << ',' << pm.stretchP95 << ','
                         << pm.stretchMax << ',' << pm.stretchMean << ',' << pm.tornFraction << ',' << pm.offsetDrift
-                        << ",,,,,,,," << exposure << "\n";
+                        << ",,,,,,,,," << exposure << "\n";
                 }
             }
             if (!poses.empty()) {

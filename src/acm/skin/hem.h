@@ -22,6 +22,7 @@ struct HemRig {
     double falloff = 1.0;
     bool pivotOnHips = false;                        // "pivot": "hips" (v2) or "mid"
     bool lowerHangs = false;                         // "lower": "gravity" (v2) or "shank"
+    bool sideDrive = false;                          // "drive": "side" (v3) or "azimuth"
     bool applyToMatched = false;                     // "apply": "all" moves matched vertices' leg weight too
     bool contact = false;                            // "contact": true, hem bones tilt at least enough to clear the thighs
     double contactClearance = 0.0;                   // "clearance", in model units
@@ -33,7 +34,7 @@ struct HemRig {
 
 // Reads {"count", "tiers", "parent", "legs": [[hip, knee, ankle], ...], "move": [...],
 //        "apply": "all"|"unmatched", "follow", "falloff", "pivot": "mid"|"hips",
-//        "lower": "shank"|"gravity", "contact": bool, "clearance"}.
+//        "lower": "shank"|"gravity", "drive": "azimuth"|"side", "contact": bool, "clearance"}.
 HemRig loadHemRig(const std::string& path, const Skeleton& skeleton);
 
 // Thigh radius per leg: mean distance of the body vertices the hip bone
