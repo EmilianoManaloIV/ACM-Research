@@ -10,4 +10,5 @@ The question-level record, above individual experiments. The workflow and gates 
 
 | ID | Question | Current gate |
 |----|----------|--------------|
-| _add rows as questions are opened_ | | |
+| [RQ-001](questions/RQ-001-garment-weight-transfer.md) | Automatic skin weights for clothing on any rigged character | B, after RQ-002 |
+| [RQ-002](questions/RQ-002-automatic-body-weights.md) | Automatic skin weights for bipeds, quadrupeds and creatures | D, implementing the first protocol |

@@ -49,7 +49,7 @@ The second form renders a fixed number of frames with a fixed timestep and saves
 
 ## Running the weight-transfer benchmark
 
-The Python tools need `pip install numpy scipy libigl pygltflib`.
+The Python tools need `pip install -r tools/requirements.txt`. Every benchmark run should be stamped with `tools/record_run.sh <results_dir>`, which writes the commit, environment and command next to the results.
 
 ```sh
 python3 tools/make_synthetic.py                      # bodies, garments and poses into data/synthetic/
