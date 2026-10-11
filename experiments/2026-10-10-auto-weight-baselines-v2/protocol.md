@@ -105,4 +105,4 @@ One run per method per character, at one commit, wrapped in `tools/record_run.sh
 
 | Date | Change | Reason | Approved by |
 |------|--------|--------|-------------|
-| | | | |
+| 2026-10-10 | BBW gets a 600 s time limit per character, and a timeout counts as a BBW failure. The first attempt at the run (commit eeffcc3) stopped after the 12 same-set characters, when TetGen ran for 2 hours on fresh character 084f8b12 without finishing. That attempt produced no results table and is discarded, and the whole run is repeated at the commit with the limit. | Healthy BBW solves here take under 10 s. Without a limit, one bad surface stalls the experiment. | Harness fix, not a method setting; reported to the director in the results summary |

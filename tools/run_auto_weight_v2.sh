@@ -18,6 +18,7 @@ BENCH="$ROOT/build/apps/bodybench/bodybench"
 LIST="$ROOT/experiments/2026-10-10-auto-weight-baselines-v2/characters.csv"
 CHARS="$ROOT/data/articulation-xl2/characters_welded"
 FLAGS="--ignore-contact --negative-tolerance 1e-6"
+BBW_LIMIT=600
 # TetGen writes temporary files into the working directory; keep them out
 # of the repository.
 mkdir -p "$OUT/tmp"
@@ -40,14 +41,17 @@ run_one() {  # set name group body [artist.csv]
   "$BENCH" "$@" $common --method "artist,floor,csv:bone_heat=$dir/bone_heat.csv" \
     ${heat:+--method-seconds bone_heat=$heat} \
     --out "$dir/results.csv" > "$dir/bodybench.log" 2>&1 || echo "$name: bodybench failed, see $dir/bodybench.log"
-  # BBW in its own process: a TetGen crash is a BBW failure, not a reason to
-  # lose the other methods' rows.
-  if "$BENCH" "$@" $common --bbw-iterations 100 --method bbw --out "$dir/bbw.csv" > "$dir/bbw.log" 2>&1; then
+  # BBW in its own process, with a time limit: TetGen can crash or loop
+  # forever on a bad surface, and either is a BBW failure, not a reason to
+  # lose the other methods' rows or stall the run. Healthy solves here take
+  # seconds.
+  if timeout "$BBW_LIMIT" "$BENCH" "$@" $common --bbw-iterations 100 --method bbw --out "$dir/bbw.csv" > "$dir/bbw.log" 2>&1; then
     tail -n +2 "$dir/bbw.csv" >> "$dir/results.csv"
   else
     code=$?
-    echo "$name,bbw,weights,lbs,0,,,,,,,,,,,,\"bodybench exited with status $code (TetGen crashed)\"" >> "$dir/results.csv"
-    echo "bbw        valid 0  crashed with status $code" >> "$dir/bbw.log"
+    if [ "$code" = 124 ]; then why="timed out after $BBW_LIMIT s (TetGen did not finish)"; else why="bodybench exited with status $code (TetGen crashed)"; fi
+    echo "$name,bbw,weights,lbs,0,,,,,,,,,,,,\"$why\"" >> "$dir/results.csv"
+    echo "bbw        valid 0  $why" >> "$dir/bbw.log"
   fi
   grep -hE "^(artist|floor|bbw|bone_heat) " "$dir/bodybench.log" "$dir/bbw.log" | sed "s/^/$set_ $name /" || true
   printf '%s,%s' "$set_" "$group" > "$dir/tag.txt"
