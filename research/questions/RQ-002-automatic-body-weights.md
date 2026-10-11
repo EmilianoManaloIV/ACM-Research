@@ -1,7 +1,7 @@
 # RQ-002: Automatic skin weights for bipeds, quadrupeds and creatures
 
 - **Opened:** 2026-10-10, drafted from the director's Gate A answer on RQ-001
-- **Current gate:** D, implementing the first protocol. Gates A to C passed 2026-10-10
+- **Current gate:** E for the amended protocol (experiment `2026-10-10-auto-weight-baselines-v2`): the confirmatory run is done at `95a3c8f` and awaits independent review and the director. Gate D for its harness (PR #5) has not been recorded yet. The first experiment was sent back from Gate E: run 2 does not pass H1
 - **Evidence:** [`research/evidence/RQ-002.md`](../evidence/RQ-002.md), ready for Gate B
 - **Experiments:** [auto-weight-baselines](../../experiments/2026-10-10-auto-weight-baselines/protocol.md) (protocol approved; implementation in progress)
 - **Companion question:** [RQ-001](RQ-001-garment-weight-transfer.md), weights for clothing on these characters
@@ -50,3 +50,6 @@ Only the research director's decisions go here.
 | 2026-10-10 | A | Passed: objective as written, skeleton placement out of scope; goes before RQ-001; artist-weight agreement reported as a separate reference measure | Emiliano | |
 | 2026-10-10 | B | Passed: evidence accepted; proceed to the first protocol. Asked to build on released models from papers and companies as well | Emiliano | Learned models planned as the second experiment |
 | 2026-10-10 | C | Passed: auto-weight-baselines protocol approved; huggingface.co to be allowed for Articulation-XL2.0; a GPU machine is available later for learned models | Emiliano | |
+| 2026-10-10 | D | Passed: auto-weight-baselines harness (PR #5); overnight protocol deviations approved (group wording, 4 quadrupeds, test split only, re-run after two harness fixes); the 8-iteration BBW cap recorded as a deviation | Emiliano | Answers to the coordinator's eight consolidated questions |
+| 2026-10-10 | E | Sent back to C: "Overnight run concludes that H1 has not passed"; the amended run is the confirmatory test | Emiliano | Independent review (PR #6): reproduced, recommended revise |
+| 2026-10-10 | C | Passed: amended protocol (auto-weight-baselines-v2): welded meshes for every method, BBW at 100 iterations, explicit negative-weight tolerance, self-intersection that ignores contact; same and fresh characters reported separately; groups by skeleton topology; c84ca8a7 dropped | Emiliano | |

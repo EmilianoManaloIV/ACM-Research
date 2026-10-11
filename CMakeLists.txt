@@ -35,6 +35,9 @@ FetchContent_MakeAvailable(glfw glm)
 set(LIBIGL_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LIBIGL_BUILD_TUTORIALS OFF CACHE BOOL "" FORCE)
 set(LIBIGL_INSTALL OFF CACHE BOOL "" FORCE)
+# TetGen (AGPL) tetrahedralises meshes for bounded biharmonic weights, the
+# RQ-002 baseline B2. Research use only; see experiments/2026-10-10-auto-weight-baselines.
+set(LIBIGL_COPYLEFT_TETGEN ON CACHE BOOL "" FORCE)
 FetchContent_Declare(libigl
   GIT_REPOSITORY https://github.com/libigl/libigl.git
   GIT_TAG v2.5.0
@@ -79,9 +82,10 @@ add_library(acm_skin
   src/acm/skin/transfer.cpp
   src/acm/skin/metrics.cpp
   src/acm/skin/refine.cpp
-  src/acm/skin/hem.cpp)
+  src/acm/skin/hem.cpp
+  src/acm/skin/autoweight.cpp)
 target_include_directories(acm_skin PUBLIC src ${tinygltf_SOURCE_DIR})
-target_link_libraries(acm_skin PUBLIC igl::core)
+target_link_libraries(acm_skin PUBLIC igl::core igl_copyleft::tetgen)
 if(MSVC)
   target_compile_options(acm_skin PRIVATE /W4)
 else()
@@ -90,6 +94,7 @@ endif()
 
 add_subdirectory(apps/sandbox)
 add_subdirectory(apps/weightbench)
+add_subdirectory(apps/bodybench)
 
 enable_testing()
 add_subdirectory(tests)
